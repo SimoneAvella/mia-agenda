@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+ENV/
+
+# Agenda Secrets (LOCAL ONLY)
+Backend/auth_config.json
+Backend/tasks.json
+Backend/sessions.json
+
+# Node
+node_modules/
+dist/
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+.gemini/

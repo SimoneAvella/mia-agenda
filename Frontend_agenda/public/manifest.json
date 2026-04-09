@@ -1,0 +1,17 @@
+{
+  "name": "Agenda Personale",
+  "short_name": "Agenda",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#000000",
+  "description": "Agenda Neobrutalista sicura e veloce per gestire i tuoi task quotidiani.",
+  "icons": [
+    {
+      "src": "/pwa-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
