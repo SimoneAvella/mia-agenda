@@ -14,10 +14,6 @@ from sqlalchemy.orm import sessionmaker
 
 # --- CONFIGURAZIONE ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
-# Se siamo in locale e non c'è il DB, usiamo un fallback o un errore
-# Per il cloud, DATABASE_URL è obbligatorio.
-
-# Segreti caricati dalle Variabili d'Ambiente (Render)
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH")
 MFA_SECRET = os.environ.get("MFA_SECRET")
 
@@ -47,13 +43,11 @@ class SessionModel(Base):
     expiry = Column(DateTime)
 
 if DATABASE_URL:
-    # Fix per Render/PostgreSQL (postgres:// -> postgresql://)
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
     
     engine = create_engine(DATABASE_URL)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    # Crea le tabelle se non esistono
     Base.metadata.create_all(bind=engine)
 else:
     print("ATTENZIONE: DATABASE_URL non impostato!")
@@ -140,34 +134,29 @@ async def check_token(authorization: str = Header(None)):
 @app.get("/tasks")
 def get_tasks(db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     all_tasks = db.query(TaskModel).all()
-    # Riorganizza nel formato JSON atteso dal frontend: { "giorno": [tasks...] }
     result = {}
     for t in all_tasks:
         if t.day not in result:
             result[t.day] = []
         result[t.day].append({
-            "id": t.id,
-            "text": t.text,
-            "done": t.done,
-            "col": t.col
+            "id": t.id, "text": t.text, "done": t.done, "col": t.col
         })
     return result
 
 @app.post("/tasks")
 def update_tasks(tasks_dict: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
-    # Questo endpoint nel frontend originale invia tutto l'oggetto state
-    # Per semplicità in questa fase, svuotiamo e ricostruiamo (simile al salvataggio file)
     db.query(TaskModel).delete()
     for day, tasks in tasks_dict.items():
-        for t in tasks:
-            new_task = TaskModel(
-                id=str(t.get("id", secrets.token_hex(4))),
-                day=day,
-                text=t.get("text", ""),
-                done=t.get("done", False),
-                col=t.get("col", "todo")
-            )
-            db.add(new_task)
+        if isinstance(tasks, list):
+            for t in tasks:
+                new_task = TaskModel(
+                    id=str(t.get("id", secrets.token_hex(4))),
+                    day=day,
+                    text=t.get("text", t.get("task", "")),
+                    done=t.get("done", False),
+                    col=str(t.get("col", "0"))
+                )
+                db.add(new_task)
     db.commit()
     return {"status": "ok"}
 
@@ -175,24 +164,38 @@ def update_tasks(tasks_dict: dict, db: SessionLocal = Depends(get_db), auth: boo
 def move_task(data: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     to_date = data.get("to_date")
     task_id = data.get("task_id")
-    
     task = db.query(TaskModel).filter(TaskModel.id == str(task_id)).first()
     if task:
         task.day = to_date
         db.commit()
     return {"status": "ok"}
 
-# --- SERVE FRONTEND ---
-BACKEND_DIR = os.path.dirname(__file__)
-DIST_DIR = os.path.abspath(os.path.join(BACKEND_DIR, "..", "Frontend_agenda", "dist"))
+# --- SERVE FRONTEND (ROBUSTO) ---
+# Cerchiamo la cartella dist in modo più aggressivo
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DIST_DIR = os.path.join(BASE_DIR, "Frontend_agenda", "dist")
 
+print(f"DEBUG: BASE_DIR = {BASE_DIR}")
+print(f"DEBUG: DIST_DIR = {DIST_DIR}")
+print(f"DEBUG: Esiste DIST_DIR? {os.path.isdir(DIST_DIR)}")
+
+@app.get("/api/health")
+def health(): return {"status": "ok"}
+
+# Monta gli asset se la cartella esiste
 if os.path.isdir(DIST_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
+
     @app.get("/")
     def serve_index():
         return FileResponse(os.path.join(DIST_DIR, "index.html"))
+
     @app.get("/{full_path:path}")
     def serve_react(full_path: str):
         file_path = os.path.join(DIST_DIR, full_path)
         if os.path.isfile(file_path): return FileResponse(file_path)
         return FileResponse(os.path.join(DIST_DIR, "index.html"))
+else:
+    @app.get("/")
+    def fallback():
+        return {"error": f"Frontend non trovato in {DIST_DIR}. Controlla la struttura delle cartelle su GitHub."}
