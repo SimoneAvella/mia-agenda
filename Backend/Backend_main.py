@@ -1,19 +1,20 @@
-import os
-import json
-import hashlib
-import secrets
-import pyotp
-from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text
+import json
+import os
+import hashlib
+import secrets
+import pyotp
+from datetime import datetime, timedelta
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # --- CONFIGURAZIONE ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
+# Se siamo in locale e non c'è il DB, usiamo un fallback per lo sviluppo locale
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH")
 MFA_SECRET = os.environ.get("MFA_SECRET")
 
@@ -68,7 +69,7 @@ async def check_auth(authorization: str = Header(None)):
     db = SessionLocal()
     session = db.query(SessionModel).filter(SessionModel.token == token).first()
     db.close()
-
+    
     if not session:
         raise HTTPException(status_code=401, detail="Invalid Token")
     
@@ -82,7 +83,6 @@ async def check_auth(authorization: str = Header(None)):
     return True
 
 # --- ENDPOINTS AUTH ---
-
 @app.post("/auth/login")
 async def login(data: dict):
     pwd = data.get("password")
@@ -130,7 +130,6 @@ async def check_token(authorization: str = Header(None)):
         return {"status": "error"}
 
 # --- ENDPOINTS TASK ---
-
 @app.get("/tasks")
 def get_tasks(db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     all_tasks = db.query(TaskModel).all()
@@ -139,7 +138,10 @@ def get_tasks(db: SessionLocal = Depends(get_db), auth: bool = Depends(check_aut
         if t.day not in result:
             result[t.day] = []
         result[t.day].append({
-            "id": t.id, "text": t.text, "done": t.done, "col": t.col
+            "id": t.id,
+            "text": t.text,
+            "done": t.done,
+            "col": t.col
         })
     return result
 
@@ -164,6 +166,7 @@ def update_tasks(tasks_dict: dict, db: SessionLocal = Depends(get_db), auth: boo
 def move_task(data: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     to_date = data.get("to_date")
     task_id = data.get("task_id")
+    
     task = db.query(TaskModel).filter(TaskModel.id == str(task_id)).first()
     if task:
         task.day = to_date
@@ -171,25 +174,17 @@ def move_task(data: dict, db: SessionLocal = Depends(get_db), auth: bool = Depen
     return {"status": "ok"}
 
 # --- SERVE FRONTEND (ROBUSTO) ---
-# Cerchiamo la cartella dist in modo più aggressivo
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_DIR = os.path.join(BASE_DIR, "Frontend_agenda", "dist")
-
-print(f"DEBUG: BASE_DIR = {BASE_DIR}")
-print(f"DEBUG: DIST_DIR = {DIST_DIR}")
-print(f"DEBUG: Esiste DIST_DIR? {os.path.isdir(DIST_DIR)}")
 
 @app.get("/api/health")
 def health(): return {"status": "ok"}
 
-# Monta gli asset se la cartella esiste
 if os.path.isdir(DIST_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
-
     @app.get("/")
     def serve_index():
         return FileResponse(os.path.join(DIST_DIR, "index.html"))
-
     @app.get("/{full_path:path}")
     def serve_react(full_path: str):
         file_path = os.path.join(DIST_DIR, full_path)
@@ -198,4 +193,4 @@ if os.path.isdir(DIST_DIR):
 else:
     @app.get("/")
     def fallback():
-        return {"error": f"Frontend non trovato in {DIST_DIR}. Controlla la struttura delle cartelle su GitHub."}
+        return {"error": f"Frontend non trovato in {DIST_DIR}."}

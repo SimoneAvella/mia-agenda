@@ -1,5 +1,6 @@
 import axios from "axios";
 
+// Determina se siamo in sviluppo o produzione
 const BASE_URL = import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
 
 // Configura axios per includere il token se presente

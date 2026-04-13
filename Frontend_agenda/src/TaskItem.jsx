@@ -1,10 +1,18 @@
-import { useDraggable } from "@dnd-kit/core";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { useState, useEffect, useRef } from "react";
 
 export default function TaskItem({ task, toggleDone, editTaskText }) {
   const draggableId = task.id ? task.id : task.task;
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: draggableId });
-  
+  const { 
+    attributes, 
+    listeners, 
+    setNodeRef, 
+    transform, 
+    transition,
+    isDragging 
+  } = useSortable({ id: draggableId });
+    
   const [isEditing, setIsEditing] = useState(false);
   const displayText = task.text ? task.text : task.task;
   const [editText, setEditText] = useState(displayText);
@@ -14,19 +22,22 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.selectionStart = inputRef.current.value.length;
+      
+      inputRef.current.style.height = "auto";
+      inputRef.current.style.height = inputRef.current.scrollHeight + "px";
     }
   }, [isEditing]);
 
   const style = {
-    transform: transform
-      ? `translate3d(${transform.x}px, ${transform.y}px, 0)`
-      : undefined,
-    zIndex: isDragging ? 999 : "auto",
+    opacity: isDragging ? 0 : 1, 
     cursor: isEditing ? "text" : "grab",
     position: "relative",
     display: "flex",
     alignItems: "flex-start", 
-    wordBreak: "break-word"
+    wordBreak: "break-word",
+    touchAction: "none",
+    transform: CSS.Translate.toString(transform),
+    transition
   };
 
   const handleSave = () => {
@@ -59,12 +70,22 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
       {isEditing ? (
         <textarea
           ref={inputRef}
-          style={{ flex: 1, border: "1px solid #007bff", borderRadius: "4px", padding: "2px 4px", resize: "none", overflow: "hidden", outline: "none", fontFamily: "inherit", fontSize: "1rem", marginLeft: "6px" }}
+          style={{ 
+            flex: 1, 
+            border: "none", 
+            padding: "0", 
+            resize: "none", 
+            overflow: "hidden", 
+            outline: "none", 
+            fontFamily: "inherit", 
+            fontSize: "inherit", 
+            lineHeight: "inherit",
+            background: "transparent",
+            marginLeft: "0px" 
+          }}
           value={editText}
           onChange={(e) => {
             setEditText(e.target.value);
-            e.target.style.height = "auto";
-            e.target.style.height = e.target.scrollHeight + "px";
           }}
           onBlur={handleSave}
           onPointerDown={(e) => e.stopPropagation()} 
@@ -81,7 +102,7 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
           }}
         />
       ) : (
-        <span style={{ textDecoration: task.done ? "line-through" : "none", marginLeft: "6px", flex: 1 }}>
+        <span style={{ marginLeft: "0px", flex: 1 }}>
           {displayText}
         </span>
       )}
