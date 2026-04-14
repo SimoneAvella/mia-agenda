@@ -598,9 +598,9 @@
   }
 
   .archive-modal-overlay.is-dragging {
-    opacity: 0 !important;
-    pointer-events: none !important;
-    transition: opacity 0.1s ease;
+    opacity: 0;
+    transform: translateY(-250%);
+    transition: transform 0.1s ease, opacity 0.1s ease;
   }
 
   .archive-modal-content {

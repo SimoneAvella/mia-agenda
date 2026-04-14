@@ -407,21 +407,31 @@ function App() {
   });
 
   const customCollisionDetection = (args) => {
-    // If dragging FROM archive, significantly simplify the target search area
-    if (activeTask && activeTask.currentDay === "Backlog") {
-      const filteredContainers = args.droppableContainers.filter(c => 
+    const { active, droppableContainers } = args;
+    if (!active) return [];
+
+    const activeId = active.id;
+    
+    // Check if the item being dragged is from the Backlog
+    const isFromBacklog = tasks["Backlog"]?.some(t => (t.id || t.task) === activeId);
+
+    if (isFromBacklog) {
+      // Prioritize Day columns and Action zones
+      const filteredTargets = droppableContainers.filter(c => 
         days.includes(c.id) || c.id === "trash-zone" || c.id === "archive-zone"
       );
       
       const collisions = pointerWithin({
         ...args,
-        droppableContainers: filteredContainers
+        droppableContainers: filteredTargets
       });
 
       if (collisions.length > 0) return collisions;
+      
+      // Rect intersection as a fallback only for the filtered targets
       return rectIntersection({
         ...args,
-        droppableContainers: filteredContainers
+        droppableContainers: filteredTargets
       });
     }
 
