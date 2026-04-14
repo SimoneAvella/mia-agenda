@@ -37,6 +37,7 @@ function App() {
   const [activeTask, setActiveTask] = useState(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [movingTaskId, setMovingTaskId] = useState(null);
+  const [isDraggingFromBacklog, setIsDraggingFromBacklog] = useState(false);
   
   const lastWeekChangeRef = useRef(0);
   const activeEdgeRef = useRef(null);
@@ -76,7 +77,15 @@ function App() {
     if (isAuthenticated) {
       async function fetchTasks() {
         const data = await getTasks();
-        setTasks(data);
+        // Normalize: ensure every task has an id string
+        const normalized = {};
+        Object.keys(data).forEach(day => {
+          normalized[day] = data[day].map(t => ({
+            ...t,
+            id: String(t.id || t.task)
+          }));
+        });
+        setTasks(normalized);
       }
       fetchTasks();
     }
@@ -175,10 +184,11 @@ function App() {
       setNewTask("");
       return;
     }
+    const newId = Date.now().toString();
     const updatedTasks = {
       ...tasks,
       Backlog: [
-        { id: Date.now().toString(), text: newTask, task: newTask, done: false },
+        { id: newId, text: newTask, task: newTask, done: false },
         ...(tasks["Backlog"] || [])
       ]
     };
@@ -218,6 +228,7 @@ function App() {
     });
     if (foundTask) {
       setActiveTask({ ...foundTask, currentDay: foundDay });
+      setIsDraggingFromBacklog(foundDay === "Backlog");
     }
   };
 
@@ -274,6 +285,7 @@ function App() {
 
   const handleDragEnd = async (event) => {
     setActiveTask(null);
+    setIsDraggingFromBacklog(false);
     if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
     activeEdgeRef.current = null;
     
@@ -410,12 +422,7 @@ function App() {
     const { active, droppableContainers } = args;
     if (!active) return [];
 
-    const activeId = active.id;
-    
-    // Check if the item being dragged is from the Backlog
-    const isFromBacklog = tasks["Backlog"]?.some(t => String(t.id || t.task) === String(activeId));
-
-    if (isFromBacklog) {
+    if (isDraggingFromBacklog) {
       // Prioritize Day columns and Action zones
       const filteredTargets = droppableContainers.filter(c => 
         days.includes(c.id) || c.id === "trash-zone" || c.id === "archive-zone"
@@ -499,7 +506,7 @@ function App() {
                   <DroppableContainer key={i} className={`day-column ${isToday ? 'is-today' : ''}`} id={day}>
                     <h3 className={isToday ? "today-header" : ""}>{day}</h3>
                     <div className="column-scroll-area">
-                      <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
+                      <SortableContext items={(tasks[day] || []).map(t => String(t.id))} strategy={verticalListSortingStrategy}>
                         {tasks[day]?.map((t) => (
                           <TaskItem
                             key={t.id || t.task}
@@ -585,7 +592,7 @@ function App() {
                         autoFocus
                       />
                     )}
-                    <SortableContext items={columns[colIdx] || []} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={(columns[colIdx] || []).map(t => String(t.id))} strategy={verticalListSortingStrategy}>
                       {columns[colIdx].map((t) => (
                         <TaskItem
                           key={t.id || t.task}
@@ -672,7 +679,7 @@ function App() {
                     id="Backlog" 
                     className="archive-droppable-list"
                   >
-                    <SortableContext items={tasks["Backlog"]} strategy={rectSortingStrategy}>
+                    <SortableContext items={(tasks["Backlog"] || []).map(t => String(t.id))} strategy={rectSortingStrategy}>
                       {tasks["Backlog"].map((t) => (
                         <TaskItem
                           key={t.id || t.task}
