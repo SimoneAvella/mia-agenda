@@ -1,5 +1,6 @@
 import './App.css';
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { getWeekDates, getTodayString } from "./utils/dates";
 import TaskItem from "./TaskItem";
 import { getTasks, updateTasks, moveTaskAPI, checkAuth, logout } from "./api";
@@ -50,7 +51,7 @@ function App() {
       activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 250, tolerance: 8 },
+      activationConstraint: { delay: 200, tolerance: 10 },
     })
   );
 
@@ -493,6 +494,16 @@ function App() {
           } 
         }}
       >
+        {createPortal(
+        <DragOverlay zIndex={2000}>
+          {activeTask ? (
+            <div className="dragging-task-mirror">
+              <TaskItem task={activeTask} toggleDone={() => {}} editTaskText={() => {}} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body
+      )}
         <div className="main-layout">
           <div className="calendar-section">
             <div 

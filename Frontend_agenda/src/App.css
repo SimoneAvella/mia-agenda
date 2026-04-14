@@ -513,13 +513,14 @@
   /* Base area styling */
   .column-scroll-area {
     flex: 1;
-    overflow-y: auto !important;
-    overflow-x: hidden;
-    padding: 8px 4px 20px 4px; /* Reduced bottom padding since FABs are gone */
-    touch-action: pan-y !important;
-    -webkit-overflow-scrolling: touch; 
-    -ms-overflow-style: none;
-    scrollbar-width: none;
+    overflow-y: auto;
+    padding: 6px 0;
+    touch-action: pan-y; /* Allow scroll in day columns */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .column-scroll-area .task-item {
+    touch-action: none; /* Let dnd-kit handle touch in day columns for drag */
   }
 
   .mobile-action-center {
@@ -599,8 +600,23 @@
 
   .archive-modal-overlay.is-dragging {
     opacity: 0;
-    transform: scale(0.01);
-    transition: transform 0.1s ease, opacity 0.1s ease;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  
+  .archive-modal-overlay.is-dragging .archive-modal-content {
+    transform: scale(0.8);
+    transition: transform 0.1s ease;
+  }
+
+  /* Force touch-action: none on archive tasks so iOS doesn't scroll instead of drag */
+  .archive-droppable-list .task-item {
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .archive-droppable-list {
+    touch-action: none;
   }
 
   .archive-modal-content {
