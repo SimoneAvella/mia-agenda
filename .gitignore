@@ -13,7 +13,7 @@ Backend/sessions.json
 
 # Node
 node_modules/
-# dist/ (Removed to allow deployment via GitHub Desktop)
+# # dist/ (Removed to allow deployment via GitHub Desktop)
 .DS_Store
 
 # IDE

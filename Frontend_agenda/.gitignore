@@ -8,8 +8,8 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-# dist (Unlocked for deployment)
-dist-ssr
+# # dist (Unlocked for deployment)
+# dist-ssr
 *.local
 
 # Editor directories and files
