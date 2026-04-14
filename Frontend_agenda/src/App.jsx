@@ -210,7 +210,7 @@ function App() {
     let foundDay = null;
     
     Object.keys(tasks).forEach(day => {
-      const t = tasks[day].find(item => (item.id || item.task) === active.id);
+      const t = tasks[day].find(item => String(item.id || item.task) === String(active.id));
       if (t) {
         foundTask = t;
         foundDay = day;
@@ -293,7 +293,7 @@ function App() {
       let sourceDay = null;
 
       Object.keys(newTasks).forEach(day => {
-        const idx = newTasks[day].findIndex(t => (t.id || t.task) === activeId);
+        const idx = newTasks[day].findIndex(t => String(t.id || t.task) === String(activeId));
         if (idx !== -1) {
           foundTask = newTasks[day].splice(idx, 1)[0];
           sourceDay = day;
@@ -316,7 +316,7 @@ function App() {
       let sourceDay = null;
 
       Object.keys(newTasks).forEach(day => {
-        const idx = newTasks[day].findIndex(t => (t.id || t.task) === activeId);
+        const idx = newTasks[day].findIndex(t => String(t.id || t.task) === String(activeId));
         if (idx !== -1) {
           foundTask = newTasks[day].splice(idx, 1)[0];
           sourceDay = day;
@@ -337,7 +337,7 @@ function App() {
     let foundTask = null;
 
     Object.keys(tasks).forEach(key => {
-      const idx = (tasks[key] || []).findIndex(t => (t.id || t.task) === activeId);
+      const idx = (tasks[key] || []).findIndex(t => String(t.id || t.task) === String(activeId));
       if (idx !== -1) {
         activeContainer = key;
         activeIndex = idx;
@@ -352,7 +352,7 @@ function App() {
     let overIndex = -1;
 
     Object.keys(tasks).forEach(key => {
-      const idx = (tasks[key] || []).findIndex(t => (t.id || t.task) === overId);
+      const idx = (tasks[key] || []).findIndex(t => String(t.id || t.task) === String(overId));
       if (idx !== -1) {
         overContainer = key;
         overIndex = idx;
@@ -413,7 +413,7 @@ function App() {
     const activeId = active.id;
     
     // Check if the item being dragged is from the Backlog
-    const isFromBacklog = tasks["Backlog"]?.some(t => (t.id || t.task) === activeId);
+    const isFromBacklog = tasks["Backlog"]?.some(t => String(t.id || t.task) === String(activeId));
 
     if (isFromBacklog) {
       // Prioritize Day columns and Action zones
@@ -671,7 +671,6 @@ function App() {
                   <DroppableContainer 
                     id="Backlog" 
                     className="archive-droppable-list"
-                    disabled={activeTask && activeTask.currentDay === "Backlog"}
                   >
                     <SortableContext items={tasks["Backlog"]} strategy={rectSortingStrategy}>
                       {tasks["Backlog"].map((t) => (

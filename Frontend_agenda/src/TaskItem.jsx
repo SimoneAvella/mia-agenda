@@ -3,7 +3,7 @@ import { CSS } from "@dnd-kit/utilities";
 import { useState, useEffect, useRef } from "react";
 
 export default function TaskItem({ task, toggleDone, editTaskText }) {
-  const draggableId = task.id ? task.id : task.task;
+  const draggableId = String(task.id ? task.id : task.task);
   const { 
     attributes, 
     listeners, 
@@ -30,12 +30,12 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
 
   const style = {
     opacity: isDragging ? 0 : 1, 
-    cursor: isEditing ? "text" : "grab",
+    cursor: isEditing ? "text" : "default",
     position: "relative",
     display: "flex",
     alignItems: "flex-start", 
     wordBreak: "break-word",
-    touchAction: "none",
+    touchAction: "pan-y", /* Allow native vertical scroll on the item */
     transform: CSS.Translate.toString(transform),
     transition
   };
@@ -63,8 +63,8 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
         type="checkbox" 
         checked={task.done} 
         onChange={toggleDone}
-        onPointerDown={(e) => e.stopPropagation()}
-        style={{ marginTop: "4px", flexShrink: 0, cursor: "pointer" }} 
+        onPointerDown={(e) => e.stopPropagation()} /* Keep checkbox clickable independent of drag */
+        style={{ marginTop: "1px", flexShrink: 0, cursor: "pointer" }} 
       />
       
       {isEditing ? (
