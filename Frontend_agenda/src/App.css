@@ -599,8 +599,7 @@
 
   .archive-modal-overlay.is-dragging {
     opacity: 0;
-    transform: scale(0.9);
-    pointer-events: none;
+    transform: scale(0.01);
     transition: transform 0.1s ease, opacity 0.1s ease;
   }
 

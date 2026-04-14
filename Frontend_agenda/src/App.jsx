@@ -77,12 +77,12 @@ function App() {
     if (isAuthenticated) {
       async function fetchTasks() {
         const data = await getTasks();
-        // Normalize: ensure every task has an id string
+        // Guaranteed Unique IDs: combine day, text and index to avoid any collision
         const normalized = {};
         Object.keys(data).forEach(day => {
-          normalized[day] = data[day].map(t => ({
+          normalized[day] = data[day].map((t, i) => ({
             ...t,
-            id: String(t.id || t.task)
+            id: String(t.id || `task-${day}-${i}-${Date.now()}`)
           }));
         });
         setTasks(normalized);
@@ -506,7 +506,7 @@ function App() {
                   <DroppableContainer key={i} className={`day-column ${isToday ? 'is-today' : ''}`} id={day}>
                     <h3 className={isToday ? "today-header" : ""}>{day}</h3>
                     <div className="column-scroll-area">
-                      <SortableContext items={(tasks[day] || []).map(t => String(t.id))} strategy={verticalListSortingStrategy}>
+                      <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                         {tasks[day]?.map((t) => (
                           <TaskItem
                             key={t.id || t.task}
@@ -592,7 +592,7 @@ function App() {
                         autoFocus
                       />
                     )}
-                    <SortableContext items={(columns[colIdx] || []).map(t => String(t.id))} strategy={verticalListSortingStrategy}>
+                    <SortableContext items={columns[colIdx] || []} strategy={verticalListSortingStrategy}>
                       {columns[colIdx].map((t) => (
                         <TaskItem
                           key={t.id || t.task}
@@ -679,7 +679,7 @@ function App() {
                     id="Backlog" 
                     className="archive-droppable-list"
                   >
-                    <SortableContext items={(tasks["Backlog"] || []).map(t => String(t.id))} strategy={rectSortingStrategy}>
+                    <SortableContext items={tasks["Backlog"] || []} strategy={rectSortingStrategy}>
                       {tasks["Backlog"].map((t) => (
                         <TaskItem
                           key={t.id || t.task}
