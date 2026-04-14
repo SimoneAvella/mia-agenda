@@ -17,6 +17,7 @@ import {
 import { 
   SortableContext, 
   verticalListSortingStrategy, 
+  rectSortingStrategy,
   arrayMove 
 } from "@dnd-kit/sortable";
 import DroppableContainer from "./DroppableContainer";
@@ -34,6 +35,8 @@ function App() {
   const [newTask, setNewTask] = useState("");
   const [showTrashModal, setShowTrashModal] = useState(false);
   const [activeTask, setActiveTask] = useState(null);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
+  const [movingTaskId, setMovingTaskId] = useState(null);
   
   const lastWeekChangeRef = useRef(0);
   const activeEdgeRef = useRef(null);
@@ -46,7 +49,7 @@ function App() {
       activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
-      activationConstraint: { delay: 250, tolerance: 5 },
+      activationConstraint: { delay: 250, tolerance: 8 },
     })
   );
 
@@ -149,6 +152,21 @@ function App() {
       setTasks(newTasks);
       updateTasks(newTasks);
     }
+  };
+
+  const moveTaskToDay = async (taskId, targetDay) => {
+    const newTasks = { ...tasks };
+    if (!newTasks["Backlog"]) return;
+    const idx = newTasks["Backlog"].findIndex(t => t.id === taskId);
+    if (idx === -1) return;
+    
+    const taskToMove = { ...newTasks["Backlog"].splice(idx, 1)[0], done: false };
+    if (!newTasks[targetDay]) newTasks[targetDay] = [];
+    newTasks[targetDay].push(taskToMove);
+    
+    setTasks(newTasks);
+    await updateTasks(newTasks);
+    setMovingTaskId(null);
   };
 
   const handleAddTask = () => {
@@ -258,19 +276,68 @@ function App() {
     setActiveTask(null);
     if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
     activeEdgeRef.current = null;
+    
+    // Auto-close archive when a drop happens (successful or not)
+    if (showArchiveModal) setShowArchiveModal(false);
 
     const { active, over } = event;
     if (!over) return;
 
-    const taskId = active.id;
+    const activeId = active.id;
     const overId = over.id;
+
+    // Handle Drop on Trash
+    if (overId === "trash-zone") {
+      const newTasks = { ...tasks };
+      let foundTask = null;
+      let sourceDay = null;
+
+      Object.keys(newTasks).forEach(day => {
+        const idx = newTasks[day].findIndex(t => (t.id || t.task) === activeId);
+        if (idx !== -1) {
+          foundTask = newTasks[day].splice(idx, 1)[0];
+          sourceDay = day;
+        }
+      });
+
+      if (foundTask) {
+        if (!newTasks["Trash"]) newTasks["Trash"] = [];
+        newTasks["Trash"].push({ ...foundTask, done: false });
+        setTasks(newTasks);
+        updateTasks(newTasks);
+      }
+      return;
+    }
+
+    // Handle Drop on Archive (Backlog)
+    if (overId === "archive-zone") {
+      const newTasks = { ...tasks };
+      let foundTask = null;
+      let sourceDay = null;
+
+      Object.keys(newTasks).forEach(day => {
+        const idx = newTasks[day].findIndex(t => (t.id || t.task) === activeId);
+        if (idx !== -1) {
+          foundTask = newTasks[day].splice(idx, 1)[0];
+          sourceDay = day;
+        }
+      });
+
+      if (foundTask && sourceDay !== "Backlog") {
+        if (!newTasks["Backlog"]) newTasks["Backlog"] = [];
+        newTasks["Backlog"].push({ ...foundTask, done: false });
+        setTasks(newTasks);
+        updateTasks(newTasks);
+      }
+      return;
+    }
 
     let activeContainer = null;
     let activeIndex = -1;
     let foundTask = null;
 
     Object.keys(tasks).forEach(key => {
-      const idx = (tasks[key] || []).findIndex(t => (t.id || t.task) === taskId);
+      const idx = (tasks[key] || []).findIndex(t => (t.id || t.task) === activeId);
       if (idx !== -1) {
         activeContainer = key;
         activeIndex = idx;
@@ -280,12 +347,6 @@ function App() {
 
     if (!activeContainer || !foundTask) return;
 
-    if (overId === "trash-zone") {
-      if (window.confirm(`Vuoi davvero eliminare "${foundTask.text || foundTask.task}"?`)) {
-        deleteTask(activeContainer, taskId, foundTask.task || foundTask.text);
-      }
-      return;
-    }
 
     let overContainer = overId;
     let overIndex = -1;
@@ -346,12 +407,42 @@ function App() {
   });
 
   const customCollisionDetection = (args) => {
+    // If dragging FROM archive, significantly simplify the target search area
+    if (activeTask && activeTask.currentDay === "Backlog") {
+      const filteredContainers = args.droppableContainers.filter(c => 
+        days.includes(c.id) || c.id === "trash-zone" || c.id === "archive-zone"
+      );
+      
+      const collisions = pointerWithin({
+        ...args,
+        droppableContainers: filteredContainers
+      });
+
+      if (collisions.length > 0) return collisions;
+      return rectIntersection({
+        ...args,
+        droppableContainers: filteredContainers
+      });
+    }
+
     const pointerCollisions = pointerWithin(args);
-    const rectCollisions = rectIntersection(args);
-    const trashCollision = pointerCollisions.find(c => c.id === "trash-zone") || rectCollisions.find(c => c.id === "trash-zone");
-    
-    if (trashCollision) return [trashCollision];
-    return pointerCollisions.length > 0 ? pointerCollisions : rectCollisions;
+    if (pointerCollisions.length > 0) {
+      // Prioritize Trash and Archive Zones
+      const trash = pointerCollisions.find(c => c.id === "trash-zone");
+      if (trash) return [trash];
+      const archive = pointerCollisions.find(c => c.id === "archive-zone");
+      if (archive) return [archive];
+
+      // If dragging FROM archive, prioritize days
+      if (activeTask && activeTask.currentDay === "Backlog") {
+        const day = pointerCollisions.find(c => days.includes(c.id));
+        if (day) return [day];
+      }
+      return pointerCollisions;
+    }
+
+    // Fallback to rectIntersection only if pointer is not over anything
+    return rectIntersection(args);
   };
 
   return (
@@ -362,7 +453,13 @@ function App() {
           <div className="mobile-nav-controls">
             <button onClick={prevWeek}>←</button>
             <button onClick={nextWeek}>→</button>
-            <button onClick={handleLogout}>🚪</button>
+            <button className="logout-btn" onClick={handleLogout} title="Logout">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
@@ -373,7 +470,11 @@ function App() {
         onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         collisionDetection={customCollisionDetection}
-        measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        measuring={{ 
+          droppable: { 
+            strategy: MeasuringStrategy.WhileDragging 
+          } 
+        }}
       >
         <div className="main-layout">
           <div className="calendar-section">
@@ -403,21 +504,23 @@ function App() {
                 );
               })}
               {isMobile && (
-                <DroppableContainer className="day-column mobile-backlog-column" id="mobile-backlog">
-                  <h3>ATTIVITÀ 📋</h3>
-                  <div className="column-scroll-area">
-                    <SortableContext items={tasks["Backlog"] || []} strategy={verticalListSortingStrategy}>
-                      {tasks["Backlog"]?.map((t) => (
-                        <TaskItem
-                          key={t.id || t.task}
-                          task={t}
-                          toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)}
-                          editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)}
-                        />
-                      ))}
-                    </SortableContext>
+                <div className="day-column mobile-backlog-column">
+                  <h3>MENU AZIONI 🚀</h3>
+                  <div className="mobile-action-center">
+                    
+                    <DroppableContainer id="archive-zone" className="action-btn-circ-wrapper" onClick={() => setShowArchiveModal(true)}>
+                      <button className="action-btn-circ archive" title="Archivio" style={{ pointerEvents: "none" }}>
+                        <span className="icon">📝</span>
+                      </button>
+                    </DroppableContainer>
+
+                    <DroppableContainer id="trash-zone" className="action-btn-circ-wrapper" onClick={() => setShowTrashModal(true)}>
+                      <button className="action-btn-circ trash" title="Cestino" style={{ pointerEvents: "none" }}>
+                        <span className="icon">🗑️</span>
+                      </button>
+                    </DroppableContainer>
                   </div>
-                </DroppableContainer>
+                </div>
               )}
             </div>
           </div>
@@ -440,7 +543,13 @@ function App() {
                 <div className="week-nav-buttons">
                   <button onClick={prevWeek}>←</button>
                   <button onClick={nextWeek}>→</button>
-                  <button onClick={handleLogout} title="Logout">🚪</button>
+                  <button className="logout-btn" onClick={handleLogout} title="Logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
+                  </button>
                 </div>
               </div>
               <div className="backlog-columns">
@@ -507,16 +616,71 @@ function App() {
             </div>
           ) : null}
         </DragOverlay>
+
+        {showTrashModal && (
+          <div className="trash-modal-overlay" onClick={() => setShowTrashModal(false)}>
+            <div className="trash-modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="trash-modal-header">
+                <h2>Cestino 🗑️</h2>
+                <button className="close-modal-btn" onClick={() => setShowTrashModal(false)}>✖</button>
+              </div>
+              <div className="trash-items-list">
+                {(!tasks["Trash"] || tasks["Trash"].length === 0) ? (
+                  <p style={{ textAlign: "center", color: "#888" }}>Il cestino è vuoto.</p>
+                ) : (
+                  tasks["Trash"].map((t, idx) => (
+                    <div key={t.id || idx} className="trash-item">
+                      <span>{t.text || t.task}</span>
+                      <button onClick={() => restoreTask(t.id)}>Ripristina</button>
+                    </div>
+                  ))
+                )}
+              </div>
+              {tasks["Trash"] && tasks["Trash"].length > 0 && (
+                <button className="empty-trash-btn" onClick={emptyTrash}>Svuota Cestino</button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {showArchiveModal && (
+          <div className={activeTask ? "archive-modal-overlay is-dragging" : "archive-modal-overlay"} onClick={() => setShowArchiveModal(false)}>
+            <div className="archive-modal-content" onClick={(e) => e.stopPropagation()}>
+              <div className="archive-modal-header">
+                <h2>Archivio 📋</h2>
+                <div className="archive-header-actions">
+                  <button className="archive-header-add-btn" onClick={() => setIsQuickAddOpen(true)}>➕</button>
+                  <button className="close-modal-btn" onClick={() => setShowArchiveModal(false)}>✖</button>
+                </div>
+              </div>
+              
+              <div className="archive-items-list">
+                {(!tasks["Backlog"] || tasks["Backlog"].length === 0) ? (
+                  <p style={{ textAlign: "center", color: "#888", padding: "20px" }}>Nessuna attività in archivio.</p>
+                ) : (
+                  <DroppableContainer 
+                    id="Backlog" 
+                    className="archive-droppable-list"
+                    disabled={activeTask && activeTask.currentDay === "Backlog"}
+                  >
+                    <SortableContext items={tasks["Backlog"]} strategy={rectSortingStrategy}>
+                      {tasks["Backlog"].map((t) => (
+                        <TaskItem
+                          key={t.id || t.task}
+                          task={t}
+                          toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)}
+                          editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)}
+                        />
+                      ))}
+                    </SortableContext>
+                  </DroppableContainer>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </DndContext>
 
-      {isMobile && (
-        <div className="mobile-fab-group">
-          <button className="fab-add" onClick={() => setIsQuickAddOpen(true)}>+</button>
-          <DroppableContainer id="trash-zone" className="fab-trash-wrapper" onClick={() => setShowTrashModal(true)}>
-            <div className="fab-trash">🗑️</div>
-          </DroppableContainer>
-        </div>
-      )}
 
       {isQuickAddOpen && (
         <div className="modal-overlay" onClick={() => setIsQuickAddOpen(false)}>
@@ -537,33 +701,6 @@ function App() {
         </div>
       )}
 
-      {showTrashModal && (
-        <div className="trash-modal-overlay" onClick={() => setShowTrashModal(false)}>
-          <div className="trash-modal-content" onClick={(e) => e.stopPropagation()}>
-            <div className="trash-modal-header">
-              <h2>Cestino 🗑️</h2>
-              <button className="close-modal-btn" onClick={() => setShowTrashModal(false)}>✖</button>
-            </div>
-            <div className="trash-items-list">
-              {(!tasks["Trash"] || tasks["Trash"].length === 0) ? (
-                <p style={{ textAlign: "center", color: "#888" }}>Il cestino è vuoto.</p>
-              ) : (
-                tasks["Trash"].map((t, idx) => (
-                  <div key={t.id || t.task || idx} className="trash-item">
-                    <span className="trash-item-text">{t.text || t.task}</span>
-                    <button className="restore-btn" onClick={() => restoreTask(t.id)}>
-                      ♻️ Ripristina
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-            {tasks["Trash"] && tasks["Trash"].length > 0 && (
-              <button className="empty-trash-btn" onClick={emptyTrash}>Svuota Cestino</button>
-            )}
-          </div>
-        </div>
-      )}
     </div>
   );
 }

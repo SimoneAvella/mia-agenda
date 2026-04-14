@@ -1,8 +1,9 @@
 import { useDroppable } from "@dnd-kit/core";
 
-export default function DroppableContainer({ id, className, children, onClick, title }) {
+export default function DroppableContainer({ id, className, children, onClick, title, disabled }) {
   const { isOver, setNodeRef } = useDroppable({
     id: id,
+    disabled: disabled
   });
 
   return (
