@@ -390,20 +390,25 @@
 ========================= */
 .archive-modal-overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
   background: rgba(0, 0, 0, 0.4);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   padding: 15px 12px;
+  box-sizing: border-box;
 }
 
 .archive-modal-content {
   background: white;
   width: 100%;
   max-width: 600px;
+  height: 80vh; /* Make it globally take up space */
   max-height: 92vh;
   border-radius: 20px;
   padding: 15px 10px;
@@ -622,17 +627,18 @@
     position: fixed;
     top: 0;
     left: 0;
-    right: 0;
-    bottom: 0;
+    width: 100vw;
+    height: 100vh;
     background: rgba(0, 0, 0, 0.4);
     backdrop-filter: blur(4px);
-    z-index: 1000;
+    z-index: 10000;
     display: flex;
     align-items: flex-start;
     justify-content: center;
     padding-top: 15px;
     padding-left: 12px;
     padding-right: 12px;
+    box-sizing: border-box;
   }
 
   .archive-modal-overlay.is-dragging {
@@ -659,6 +665,7 @@
   .archive-modal-content {
     background: white;
     width: 100%;
+    height: 85vh; /* Force large height always */
     max-height: 92vh;
     border-radius: 20px;
     padding: 15px 10px;
