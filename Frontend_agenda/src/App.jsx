@@ -424,9 +424,9 @@ function App() {
     if (!active) return [];
 
     if (isDraggingFromBacklog) {
-      // Prioritize Day columns and Action zones
+      // Prioritize Day columns, Action zones, AND its own Backlog container
       const filteredTargets = droppableContainers.filter(c => 
-        days.includes(c.id) || c.id === "trash-zone" || c.id === "archive-zone"
+        days.includes(c.id) || c.id === "trash-zone" || c.id === "archive-zone" || c.id === "Backlog"
       );
       
       const collisions = pointerWithin({
