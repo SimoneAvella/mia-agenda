@@ -178,11 +178,13 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIST_DIR = os.path.join(BASE_DIR, "Frontend_agenda", "dist")
 
 @app.get("/api/health")
+@app.head("/api/health")
 def health(): return {"status": "ok"}
 
 if os.path.isdir(DIST_DIR):
     app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
     @app.get("/")
+    @app.head("/")
     def serve_index():
         return FileResponse(os.path.join(DIST_DIR, "index.html"))
     @app.get("/{full_path:path}")
