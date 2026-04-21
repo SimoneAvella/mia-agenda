@@ -39,6 +39,7 @@ function App() {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [movingTaskId, setMovingTaskId] = useState(null);
   const [isDraggingFromBacklog, setIsDraggingFromBacklog] = useState(false);
+  const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null
   
   const lastWeekChangeRef = useRef(0);
   const activeEdgeRef = useRef(null);
@@ -230,16 +231,19 @@ function App() {
     if (foundTask) {
       setActiveTask({ ...foundTask, currentDay: foundDay });
       setIsDraggingFromBacklog(foundDay === "Backlog");
+      // Reset edge tracking on start
+      setDraggingEdge(null);
+      activeEdgeRef.current = null;
+      if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
     }
   };
 
   const handleDragMove = (event) => {
-    if (!isMobile) return;
     const { active } = event;
-    const x = event.pointerCoordinates?.x || active?.rect?.current?.translated?.left;
-    if (x === undefined || x === null) return;
+    const x = event.pointerCoordinates?.x;
+    if (!x) return;
     
-    const threshold = 60; 
+    const threshold = 70; 
     let currentEdge = null;
     if (x < threshold) currentEdge = 'left';
     else if (x > window.innerWidth - threshold) currentEdge = 'right';
@@ -247,16 +251,21 @@ function App() {
     if (currentEdge !== activeEdgeRef.current) {
       if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
       activeEdgeRef.current = currentEdge;
+      setDraggingEdge(currentEdge);
+
       if (currentEdge) {
         weekTimerRef.current = setTimeout(() => {
           const now = Date.now();
-          if (now - lastWeekChangeRef.current > 1500) {
+          // Prevent too frequent changes
+          if (now - lastWeekChangeRef.current > 1200) {
             if (activeEdgeRef.current === 'left') prevWeek();
             else if (activeEdgeRef.current === 'right') nextWeek();
             lastWeekChangeRef.current = now;
           }
+          // Reset after action
+          setDraggingEdge(null);
+          activeEdgeRef.current = null;
           weekTimerRef.current = null;
-          activeEdgeRef.current = null; 
         }, 1200);
       }
     }
@@ -406,6 +415,12 @@ function App() {
 
     setTasks(updatedTasks);
     updateTasks(updatedTasks);
+    
+    // Cleanup edge tracking
+    setDraggingEdge(null);
+    activeEdgeRef.current = null;
+    if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
+
     try {
       await updateTasks(updatedTasks);
     } catch (e) {
@@ -464,7 +479,7 @@ function App() {
   };
 
   return (
-    <div className="app-container">
+    <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`}>
       {isMobile && (
         <div className="mobile-top-nav">
           <span className="mobile-title">Calendario 🗓️</span>

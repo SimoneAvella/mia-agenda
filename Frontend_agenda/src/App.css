@@ -47,6 +47,25 @@
   box-sizing: border-box;
   color: #334155;
   overflow: hidden; 
+  position: relative; /* For edge indicators */
+  transition: box-shadow 0.3s ease;
+}
+
+/* Edge Swapping Indicators */
+.app-container.edge-active-left {
+  box-shadow: inset 15px 0 30px -10px rgba(59, 130, 246, 0.4);
+  animation: edgePulse 1.2s infinite;
+}
+
+.app-container.edge-active-right {
+  box-shadow: inset -15px 0 30px -10px rgba(59, 130, 246, 0.4);
+  animation: edgePulse 1.2s infinite;
+}
+
+@keyframes edgePulse {
+  0% { opacity: 0.6; }
+  50% { opacity: 1; }
+  100% { opacity: 0.6; }
 }
 
 .main-layout {
