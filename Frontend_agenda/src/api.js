@@ -30,12 +30,32 @@ export async function loginStep2(password, code, remember) {
 }
 
 export async function checkAuth() {
-  try {
-    const res = await api.get(`/auth/check`);
-    return res.data.status === "ok";
-  } catch (e) {
-    return false;
+  const maxRetries = 6;
+  const retryDelay = 5000; // 5 secondi tra i tentativi
+
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const res = await api.get(`/auth/check`);
+      return res.data.status === "ok";
+    } catch (e) {
+      // Se è un errore 401 (non autorizzato), significa che il token è volutamente negato dal server.
+      // In questo caso non ha senso riprovare, l'utente DEVE loggare.
+      if (e.response && e.response.status === 401) {
+        return false;
+      }
+
+      // Se non è l'ultimo tentativo, attendiamo e riproviamo
+      if (i < maxRetries - 1) {
+        console.log(`Server offline o in risveglio. Tentativo ${i + 1}/${maxRetries}...`);
+        await new Promise(r => setTimeout(r, retryDelay));
+        continue;
+      }
+      
+      // Se arriviamo qui, abbiamo esaurito i tentativi
+      return false;
+    }
   }
+  return false;
 }
 
 export function logout() {

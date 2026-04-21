@@ -848,3 +848,36 @@
     display: none !important;
   }
 }
+
+/* =========================
+   LOADING SCREEN
+========================= */
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8fafc;
+  color: #1e293b;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  font-size: 1.1rem;
+  flex-direction: column;
+  gap: 20px;
+  z-index: 20000;
+}
+
+.loading-screen::after {
+  content: "";
+  width: 30px;
+  height: 30px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
