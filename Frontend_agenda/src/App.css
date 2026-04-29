@@ -174,31 +174,28 @@
 }
 
 /* Tiny + button on each day column */
-.day-add-btn {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1.5px solid #cbd5e1;
+.day-add-btn-bottom {
+  width: 100%;
+  margin-top: 4px;
+  padding: 5px 4px;
   background: transparent;
+  border: none;
+  border-top: 1px dashed #e2e8f0;
   color: #94a3b8;
-  font-size: 16px;
-  line-height: 1;
+  font-size: 11px;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 500;
+  text-align: left;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  padding: 0;
+  border-radius: 0 0 6px 6px;
   transition: all 0.15s ease;
-  opacity: 0.5;
+  letter-spacing: 0.01em;
 }
 
-.day-column:hover .day-add-btn,
-.day-add-btn:focus {
-  opacity: 1;
-  border-color: #3b82f6;
+.day-add-btn-bottom:hover {
   color: #3b82f6;
   background: #eff6ff;
+  border-top-color: #bfdbfe;
 }
 
 /* Inline task input */

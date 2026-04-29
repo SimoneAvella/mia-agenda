@@ -552,16 +552,29 @@ function App() {
               {days.map((day, i) => {
                 const isToday = day === getTodayString();
                 return (
-                  <DroppableContainer key={i} className={`day-column ${isToday ? 'is-today' : ''}`} id={day}>
-                    <div className="day-column-header">
-                      <h3 className={isToday ? "today-header" : ""}>{day}</h3>
-                      <button
-                        className="day-add-btn"
-                        title={`Aggiungi task a ${day}`}
-                        onClick={(e) => { e.stopPropagation(); setAddingToDay(day); setInlineDayTask(""); }}
-                      >+</button>
-                    </div>
-                    <div className="column-scroll-area">
+                  <DroppableContainer
+                    key={i}
+                    className={`day-column ${isToday ? 'is-today' : ''}`}
+                    id={day}
+                    onClick={(e) => {
+                      // Only open if clicking directly on the column background (not on a task/button)
+                      if (e.target === e.currentTarget || e.target.classList.contains('column-scroll-area')) {
+                        setAddingToDay(day);
+                        setInlineDayTask("");
+                      }
+                    }}
+                  >
+                    <h3 className={isToday ? "today-header" : ""}>{day}</h3>
+                    <div
+                      className="column-scroll-area"
+                      onClick={(e) => {
+                        // Clicking empty space inside scroll area also opens
+                        if (e.target === e.currentTarget) {
+                          setAddingToDay(day);
+                          setInlineDayTask("");
+                        }
+                      }}
+                    >
                       <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                         {tasks[day]?.map((t) => (
                           <TaskItem
@@ -572,30 +585,30 @@ function App() {
                           />
                         ))}
                       </SortableContext>
-                      {addingToDay === day && (
-                        <div className="inline-day-input-wrapper">
-                          <textarea
-                            className="inline-day-textarea"
-                            placeholder="Nuovo task..."
-                            value={inlineDayTask}
-                            autoFocus
-                            rows={2}
-                            onChange={(e) => setInlineDayTask(e.target.value)}
-                            onBlur={() => handleAddTaskToDay(day)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.preventDefault();
-                                handleAddTaskToDay(day);
-                              }
-                              if (e.key === 'Escape') {
-                                setAddingToDay(null);
-                                setInlineDayTask("");
-                              }
-                            }}
-                          />
-                        </div>
-                      )}
                     </div>
+                    {addingToDay === day && (
+                      <div className="inline-day-input-wrapper">
+                        <textarea
+                          className="inline-day-textarea"
+                          placeholder="Scrivi attività e premi Invio..."
+                          value={inlineDayTask}
+                          autoFocus
+                          rows={2}
+                          onChange={(e) => setInlineDayTask(e.target.value)}
+                          onBlur={() => handleAddTaskToDay(day)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAddTaskToDay(day);
+                            }
+                            if (e.key === 'Escape') {
+                              setAddingToDay(null);
+                              setInlineDayTask("");
+                            }
+                          }}
+                        />
+                      </div>
+                    )}
                   </DroppableContainer>
                 );
               })}
