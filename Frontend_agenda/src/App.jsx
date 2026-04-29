@@ -40,6 +40,8 @@ function App() {
   const [movingTaskId, setMovingTaskId] = useState(null);
   const [isDraggingFromBacklog, setIsDraggingFromBacklog] = useState(false);
   const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null
+  const [addingToDay, setAddingToDay] = useState(null); // which day column is open for inline add
+  const [inlineDayTask, setInlineDayTask] = useState(""); // text in the inline input
   
   const lastWeekChangeRef = useRef(0);
   const activeEdgeRef = useRef(null);
@@ -199,6 +201,27 @@ function App() {
     setShowInput(false);
     updateTasks(updatedTasks);
   };
+
+  const handleAddTaskToDay = (day) => {
+    if (inlineDayTask.trim() === "") {
+      setAddingToDay(null);
+      setInlineDayTask("");
+      return;
+    }
+    const newId = Date.now().toString();
+    const updatedTasks = {
+      ...tasks,
+      [day]: [
+        ...(tasks[day] || []),
+        { id: newId, text: inlineDayTask, task: inlineDayTask, done: false }
+      ]
+    };
+    setTasks(updatedTasks);
+    setInlineDayTask("");
+    setAddingToDay(null);
+    updateTasks(updatedTasks);
+  };
+
 
   const prevWeek = () => {
     setWeekStart(prev => {
@@ -530,7 +553,14 @@ function App() {
                 const isToday = day === getTodayString();
                 return (
                   <DroppableContainer key={i} className={`day-column ${isToday ? 'is-today' : ''}`} id={day}>
-                    <h3 className={isToday ? "today-header" : ""}>{day}</h3>
+                    <div className="day-column-header">
+                      <h3 className={isToday ? "today-header" : ""}>{day}</h3>
+                      <button
+                        className="day-add-btn"
+                        title={`Aggiungi task a ${day}`}
+                        onClick={(e) => { e.stopPropagation(); setAddingToDay(day); setInlineDayTask(""); }}
+                      >+</button>
+                    </div>
                     <div className="column-scroll-area">
                       <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                         {tasks[day]?.map((t) => (
@@ -542,6 +572,29 @@ function App() {
                           />
                         ))}
                       </SortableContext>
+                      {addingToDay === day && (
+                        <div className="inline-day-input-wrapper">
+                          <textarea
+                            className="inline-day-textarea"
+                            placeholder="Nuovo task..."
+                            value={inlineDayTask}
+                            autoFocus
+                            rows={2}
+                            onChange={(e) => setInlineDayTask(e.target.value)}
+                            onBlur={() => handleAddTaskToDay(day)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                handleAddTaskToDay(day);
+                              }
+                              if (e.key === 'Escape') {
+                                setAddingToDay(null);
+                                setInlineDayTask("");
+                              }
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
                   </DroppableContainer>
                 );

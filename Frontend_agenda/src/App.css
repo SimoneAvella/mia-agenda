@@ -148,6 +148,85 @@
   font-weight: 800;
 }
 
+/* Day column header row */
+.day-column-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 4px;
+  min-height: 32px;
+}
+
+.day-column-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  color: black;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  text-align: center;
+  z-index: 2;
+  position: relative;
+}
+
+/* Tiny + button on each day column */
+.day-add-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1.5px solid #cbd5e1;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 0;
+  transition: all 0.15s ease;
+  opacity: 0.5;
+}
+
+.day-column:hover .day-add-btn,
+.day-add-btn:focus {
+  opacity: 1;
+  border-color: #3b82f6;
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+/* Inline task input */
+.inline-day-input-wrapper {
+  margin-top: 6px;
+  animation: fadeInInput 0.15s ease;
+}
+
+@keyframes fadeInInput {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.inline-day-textarea {
+  width: 100%;
+  border: 1.5px solid #3b82f6;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-family: 'Outfit', sans-serif;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+  background: #eff6ff;
+  color: #1e293b;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
 /* =========================
    BACKLOG (Sidebar Desktop)
 ========================= */
