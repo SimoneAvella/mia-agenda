@@ -552,45 +552,30 @@ function App() {
               {days.map((day, i) => {
                 const isToday = day === getTodayString();
                 return (
-                  <DroppableContainer
-                    key={i}
-                    className={`day-column ${isToday ? 'is-today' : ''}`}
-                    id={day}
-                    onClick={(e) => {
-                      // Only open if clicking directly on the column background (not on a task/button)
-                      if (e.target === e.currentTarget || e.target.classList.contains('column-scroll-area')) {
-                        setAddingToDay(day);
-                        setInlineDayTask("");
-                      }
-                    }}
-                  >
-                    <h3 className={isToday ? "today-header" : ""}>{day}</h3>
-                    <div
-                      className="column-scroll-area"
-                      onClick={(e) => {
-                        // Clicking empty space inside scroll area also opens
-                        if (e.target === e.currentTarget) {
-                          setAddingToDay(day);
-                          setInlineDayTask("");
-                        }
-                      }}
+                  <div key={i} className={`day-column-wrapper ${isToday ? 'is-today-wrapper' : ''}`}>
+                    <DroppableContainer
+                      className={`day-column ${isToday ? 'is-today' : ''}`}
+                      id={day}
                     >
-                      <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
-                        {tasks[day]?.map((t) => (
-                          <TaskItem
-                            key={t.id || t.task}
-                            task={t}
-                            toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
-                            editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
-                          />
-                        ))}
-                      </SortableContext>
-                    </div>
-                    {addingToDay === day && (
+                      <h3 className={isToday ? "today-header" : ""}>{day}</h3>
+                      <div className="column-scroll-area">
+                        <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
+                          {tasks[day]?.map((t) => (
+                            <TaskItem
+                              key={t.id || t.task}
+                              task={t}
+                              toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
+                              editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
+                            />
+                          ))}
+                        </SortableContext>
+                      </div>
+                    </DroppableContainer>
+                    {addingToDay === day ? (
                       <div className="inline-day-input-wrapper">
                         <textarea
                           className="inline-day-textarea"
-                          placeholder="Scrivi attività e premi Invio..."
+                          placeholder="Scrivi e premi Invio..."
                           value={inlineDayTask}
                           autoFocus
                           rows={2}
@@ -608,8 +593,14 @@ function App() {
                           }}
                         />
                       </div>
+                    ) : (
+                      <button
+                        className="day-add-btn-bottom"
+                        onPointerDown={(e) => e.stopPropagation()}
+                        onClick={(e) => { e.stopPropagation(); setAddingToDay(day); setInlineDayTask(""); }}
+                      >+ task</button>
                     )}
-                  </DroppableContainer>
+                  </div>
                 );
               })}
               {isMobile && (
