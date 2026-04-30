@@ -82,15 +82,10 @@ async def check_auth(authorization: str = Header(None)):
     
     return True
 
-from passlib.context import CryptContext
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
-
-def get_password_hash(password):
-    return pwd_context.hash(password)
+    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
 
 # --- ENDPOINTS AUTH ---
 @app.post("/auth/login")
@@ -98,17 +93,21 @@ async def login(data: dict):
     print("--- TENTATIVO DI LOGIN ---")
     pwd = data.get("password")
     if not ADMIN_PASSWORD_HASH:
-        print("ERRORE: ADMIN_PASSWORD_HASH non trovata nelle variabili!")
+        print("ERRORE: ADMIN_PASSWORD_HASH non trovata!")
         raise HTTPException(status_code=500, detail="Server config error: Password hash missing")
     
-    # Debug per capire se sta usando Bcrypt
-    print(f"Metodo usato: BCRYPT. Lunghezza Hash: {len(ADMIN_PASSWORD_HASH)}")
+    # Debug
+    print(f"Metodo usato: NATIVE BCRYPT. Lunghezza Hash: {len(ADMIN_PASSWORD_HASH)}")
     
-    if not verify_password(pwd, ADMIN_PASSWORD_HASH):
-        print("LOGIN FALLITO: Password non corrispondente")
-        raise HTTPException(status_code=401, detail="Password Errata")
+    try:
+        if not verify_password(pwd, ADMIN_PASSWORD_HASH):
+            print("LOGIN FALLITO: Password errata")
+            raise HTTPException(status_code=401, detail="Password Errata")
+    except Exception as e:
+        print(f"ERRORE CRITTOGRAFIA: {e}")
+        raise HTTPException(status_code=500, detail=f"Errore tecnico: {e}")
     
-    print("LOGIN OK: Password corretta!")
+    print("LOGIN OK!")
     return {"status": "mfa_required"}
 
 @app.post("/auth/mfa")
