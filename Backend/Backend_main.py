@@ -11,10 +11,6 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine, Column, String, Boolean, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
-from passlib.context import CryptContext
-
-# Configurazione Bcrypt
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # --- CONFIGURAZIONE ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
@@ -93,8 +89,8 @@ async def login(data: dict):
     if not ADMIN_PASSWORD_HASH:
         raise HTTPException(status_code=500, detail="Server config error: Password hash missing")
     
-    # Verifica con Bcrypt invece di SHA-256
-    if not pwd_context.verify(pwd, ADMIN_PASSWORD_HASH):
+    pwd_hash = hashlib.sha256(pwd.encode()).hexdigest()
+    if pwd_hash != ADMIN_PASSWORD_HASH:
         raise HTTPException(status_code=401, detail="Password Errata")
     
     return {"status": "mfa_required"}
@@ -105,7 +101,7 @@ async def verify_mfa(data: dict):
     code = data.get("code")
     remember = data.get("remember", False)
     
-    if pwd and not pwd_context.verify(pwd, ADMIN_PASSWORD_HASH):
+    if pwd and hashlib.sha256(pwd.encode()).hexdigest() != ADMIN_PASSWORD_HASH:
         raise HTTPException(status_code=401, detail="Sessione non valida")
     
     totp = pyotp.TOTP(MFA_SECRET)
