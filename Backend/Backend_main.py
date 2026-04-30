@@ -82,17 +82,33 @@ async def check_auth(authorization: str = Header(None)):
     
     return True
 
+from passlib.context import CryptContext
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
 # --- ENDPOINTS AUTH ---
 @app.post("/auth/login")
 async def login(data: dict):
+    print("--- TENTATIVO DI LOGIN ---")
     pwd = data.get("password")
     if not ADMIN_PASSWORD_HASH:
+        print("ERRORE: ADMIN_PASSWORD_HASH non trovata nelle variabili!")
         raise HTTPException(status_code=500, detail="Server config error: Password hash missing")
     
-    pwd_hash = hashlib.sha256(pwd.encode()).hexdigest()
-    if pwd_hash != ADMIN_PASSWORD_HASH:
+    # Debug per capire se sta usando Bcrypt
+    print(f"Metodo usato: BCRYPT. Lunghezza Hash: {len(ADMIN_PASSWORD_HASH)}")
+    
+    if not verify_password(pwd, ADMIN_PASSWORD_HASH):
+        print("LOGIN FALLITO: Password non corrispondente")
         raise HTTPException(status_code=401, detail="Password Errata")
     
+    print("LOGIN OK: Password corretta!")
     return {"status": "mfa_required"}
 
 @app.post("/auth/mfa")
@@ -101,7 +117,7 @@ async def verify_mfa(data: dict):
     code = data.get("code")
     remember = data.get("remember", False)
     
-    if pwd and hashlib.sha256(pwd.encode()).hexdigest() != ADMIN_PASSWORD_HASH:
+    if pwd and not verify_password(pwd, ADMIN_PASSWORD_HASH):
         raise HTTPException(status_code=401, detail="Sessione non valida")
     
     totp = pyotp.TOTP(MFA_SECRET)
