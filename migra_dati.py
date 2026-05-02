@@ -5,7 +5,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
 # --- CONFIGURAZIONE ---
-DATABASE_URL = "postgresql://neondb_owner:npg_l0p2QuykwznL@ep-purple-band-al3rh0xi-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
+# Carica URL dal file .env o dall'ambiente
+import os
+DATABASE_URL = os.environ.get("DATABASE_URL")
 JSON_FILE = "Backend/tasks.json"
 
 Base = declarative_base()

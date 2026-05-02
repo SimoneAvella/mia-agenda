@@ -1,3 +1,4 @@
+// BUILD_TEST_12345
 import './App.css';
 import { useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -42,6 +43,81 @@ function App() {
   const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null
   const [addingToDay, setAddingToDay] = useState(null); // which day column is open for inline add
   const [inlineDayTask, setInlineDayTask] = useState(""); // text in the inline input
+  const [newTaskTime, setNewTaskTime] = useState(""); // time for the new task being added
+  const notifiedTasksRef = useRef(new Set()); // To avoid multiple notifications for same task
+  
+  // FUNZIONE PER ESTRARRE L'ORARIO AUTOMATICAMENTE
+  const parseTime = (text) => {
+    if (!text) return null;
+    
+    // Pattern 1: HH:MM o HH.MM o HH MM (ovunque nel testo)
+    const timeMatch = text.match(/\b([01]?\d|2[0-3])[:. ]([0-5]\d)\b/);
+    if (timeMatch) return `${timeMatch[1].padStart(2, '0')}:${timeMatch[2]}`;
+    
+    // Pattern 2: Solo un numero 0-23 alla FINE (es: "Meeting 15")
+    const hourEndMatch = text.match(/\b([01]?\d|2[0-3])\b\s*$/);
+    if (hourEndMatch) return `${hourEndMatch[1].padStart(2, '0')}:00`;
+
+    // Pattern 3: Solo un numero 0-23 all'INIZIO (es: "15 Barbiere")
+    const hourStartMatch = text.match(/^\s*\b([01]?\d|2[0-3])\b/);
+    if (hourStartMatch) return `${hourStartMatch[1].padStart(2, '0')}:00`;
+    
+    return null;
+  };
+
+  // FUNZIONE PER PULIRE IL TESTO DALL'ORARIO
+  const stripTime = (text) => {
+    if (!text) return "";
+    let cleaned = text;
+    // Rimuove HH:MM, HH.MM, HH MM
+    cleaned = cleaned.replace(/\b([01]?\d|2[0-3])[:. ]([0-5]\d)\b/g, "");
+    // Rimuove solo un numero 0-23 alla FINE
+    cleaned = cleaned.replace(/\b([01]?\d|2[0-3])\b\s*$/, "");
+    // Rimuove solo un numero 0-23 all'INIZIO
+    cleaned = cleaned.replace(/^\s*\b([01]?\d|2[0-3])\b/g, "");
+    return cleaned.trim();
+  };
+
+  const [detectedTime, setDetectedTime] = useState(null);
+  
+  const [pushStatus, setPushStatus] = useState('pending'); // pending, granted, denied, error
+
+  // REGISTRAZIONE PUSH NOTIFICATIONS
+  const subscribeToPush = async () => {
+    try {
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+        setPushStatus('unsupported');
+        return;
+      }
+
+      const registration = await navigator.serviceWorker.register('/sw.js');
+      const permission = await Notification.requestPermission();
+      setPushStatus(permission);
+      
+      if (permission === 'granted') {
+        const response = await fetch(`${API_BASE_URL}/vapid-public-key`);
+        const { publicKey } = await response.json();
+        
+        const subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: publicKey
+        });
+
+        await fetch(`${API_BASE_URL}/subscribe`, {
+          method: 'POST',
+          body: JSON.stringify(subscription),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem("agenda_token")}`
+          }
+        });
+        setPushStatus('granted');
+      }
+    } catch (error) {
+      console.error("Push Error:", error);
+      setPushStatus('error');
+    }
+  };
   
   const lastWeekChangeRef = useRef(0);
   const activeEdgeRef = useRef(null);
@@ -60,9 +136,18 @@ function App() {
 
   useEffect(() => {
     async function initAuth() {
-      const isOk = await checkAuth();
-      setIsAuthenticated(isOk);
-      setIsCheckingAuth(false);
+      // Diamo un respiro al sistema prima di decidere
+      try {
+        const isOk = await checkAuth();
+        setIsAuthenticated(isOk);
+      } catch (e) {
+        setIsAuthenticated(false);
+      } finally {
+        // Un piccolo ritardo extra per far stabilizzare l'UI
+        setTimeout(() => {
+          setIsCheckingAuth(false);
+        }, 500);
+      }
     }
     initAuth();
 
@@ -70,6 +155,12 @@ function App() {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      subscribeToPush();
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -95,8 +186,47 @@ function App() {
     }
   }, [isAuthenticated]);
 
+  // --- LOGICA SVEGLIA (NOTIFICHE) ---
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    // Chiedi permesso per le notifiche
+    if (Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+
+    const checkReminders = () => {
+      const now = new Date();
+      const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const todayStr = getTodayString();
+
+      if (tasks[todayStr]) {
+        tasks[todayStr].forEach(t => {
+          if (!t.done && t.time === currentTime && !notifiedTasksRef.current.has(t.id)) {
+            new Notification("PROMEMORIA AGENTA 🚀", {
+              body: `È l'ora di: ${t.text || t.task}`,
+              icon: "/favicon.ico",
+              requireInteraction: true // La notifica resta finché non la chiudi
+            });
+            notifiedTasksRef.current.add(t.id);
+          }
+        });
+      }
+    };
+
+    const interval = setInterval(checkReminders, 30000); // Controlla ogni 30 secondi
+    return () => clearInterval(interval);
+  }, [isAuthenticated, tasks]);
+
   if (isCheckingAuth) {
-    return <div className="loading-screen">Caricamento sicurezza...</div>;
+    return (
+      <div className="loading-screen">
+        <div style={{ textAlign: 'center' }}>
+          <p>Svegliando l'agenda... ☕</p>
+          <p style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>Il primo accesso può richiedere fino a 30 secondi.</p>
+        </div>
+      </div>
+    );
   }
 
   if (!isAuthenticated) {
@@ -186,40 +316,52 @@ function App() {
     if (newTask.trim() === "") {
       setShowInput(false);
       setNewTask("");
+      setDetectedTime(null);
       return;
     }
     const newId = Date.now().toString();
+    const timeToSet = detectedTime || parseTime(newTask);
+    const cleanedText = stripTime(newTask); // Puliamo il testo!
+    
     const updatedTasks = {
       ...tasks,
       Backlog: [
-        { id: newId, text: newTask, task: newTask, done: false },
+        { id: newId, text: cleanedText, task: cleanedText, done: false, time: timeToSet },
         ...(tasks["Backlog"] || [])
       ]
     };
     setTasks(updatedTasks);
     setNewTask("");
+    setDetectedTime(null);
     setShowInput(false);
     updateTasks(updatedTasks);
   };
 
-  const handleAddTaskToDay = (day) => {
+  const handleAddTaskToDay = async (day) => {
     if (inlineDayTask.trim() === "") {
       setAddingToDay(null);
-      setInlineDayTask("");
+      setDetectedTime(null);
       return;
     }
-    const newId = Date.now().toString();
-    const updatedTasks = {
-      ...tasks,
-      [day]: [
-        ...(tasks[day] || []),
-        { id: newId, text: inlineDayTask, task: inlineDayTask, done: false }
-      ]
+    
+    const timeToSet = detectedTime || parseTime(inlineDayTask);
+    const cleanedText = stripTime(inlineDayTask); // Puliamo il testo!
+    
+    const newTaskObj = {
+      id: `task-${day}-${Date.now()}`,
+      task: cleanedText,
+      done: false,
+      time: timeToSet
     };
-    setTasks(updatedTasks);
-    setInlineDayTask("");
+    
+    const newTasks = { ...tasks };
+    if (!newTasks[day]) newTasks[day] = [];
+    newTasks[day].push(newTaskObj);
+    setTasks(newTasks);
     setAddingToDay(null);
-    updateTasks(updatedTasks);
+    setInlineDayTask("");
+    setDetectedTime(null);
+    await updateTasks(newTasks);
   };
 
 
@@ -262,14 +404,13 @@ function App() {
   };
 
   const handleDragMove = (event) => {
-    const { active } = event;
-    const x = event.pointerCoordinates?.x;
-    if (!x) return;
+    const { over } = event;
     
-    const threshold = 70; 
+    // Gestione dei Portali Droppable (Frecce)
+    const overId = over?.id;
     let currentEdge = null;
-    if (x < threshold) currentEdge = 'left';
-    else if (x > window.innerWidth - threshold) currentEdge = 'right';
+    if (overId === 'prev-week-btn') currentEdge = 'left';
+    else if (overId === 'next-week-btn') currentEdge = 'right';
     
     if (currentEdge !== activeEdgeRef.current) {
       if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
@@ -279,16 +420,13 @@ function App() {
       if (currentEdge) {
         weekTimerRef.current = setTimeout(() => {
           const now = Date.now();
-          // Prevent too frequent changes
           if (now - lastWeekChangeRef.current > 1200) {
             if (activeEdgeRef.current === 'left') prevWeek();
             else if (activeEdgeRef.current === 'right') nextWeek();
             lastWeekChangeRef.current = now;
           }
-          // Reset after action
           setDraggingEdge(null);
           activeEdgeRef.current = null;
-          weekTimerRef.current = null;
         }, 1200);
       }
     }
@@ -462,7 +600,7 @@ function App() {
     if (!active) return [];
 
     if (isDraggingFromBacklog) {
-      // Prioritize Day columns, Action zones, AND its own Backlog container
+      // Prioritize Day columns, Action zones, and its own Backlog container
       const filteredTargets = droppableContainers.filter(c => 
         days.includes(c.id) || c.id === "trash-zone" || c.id === "archive-zone" || c.id === "Backlog"
       );
@@ -533,7 +671,7 @@ function App() {
         }}
       >
         {createPortal(
-        <DragOverlay zIndex={2000}>
+        <DragOverlay className="dragging-task-mirror">
           {activeTask ? (
             <div className="dragging-task-mirror">
               <TaskItem task={activeTask} toggleDone={() => {}} editTaskText={() => {}} />
@@ -553,64 +691,81 @@ function App() {
                 const isToday = day === getTodayString();
                 return (
                   <div key={i} className={`day-column-wrapper ${isToday ? 'is-today-wrapper' : ''}`}>
-                    <DroppableContainer
-                      className={`day-column ${isToday ? 'is-today' : ''}`}
+                    <DroppableContainer 
+                      className={`day-column ${isToday ? 'is-today' : ''}`} 
                       id={day}
                     >
                       <h3 className={isToday ? "today-header" : ""}>{day}</h3>
-                      <div className="column-scroll-area">
+                      <div 
+                        className="column-scroll-area" 
+                        style={{ flex: 1, display: 'flex', flexDirection: 'column' }}
+                        onDoubleClick={() => {
+                          setAddingToDay(day);
+                          setInlineDayTask("");
+                          setDetectedTime(null);
+                        }}
+                      >
                         <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                           {tasks[day]?.map((t) => (
-                            <TaskItem
-                              key={t.id || t.task}
-                              task={t}
-                              toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
-                              editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
-                            />
+                            <div key={t.id || t.task} onPointerDown={(e) => e.stopPropagation()}>
+                              <TaskItem
+                                task={t}
+                                toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
+                                editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
+                              />
+                            </div>
                           ))}
                         </SortableContext>
+
+                        {/* Il box d'inserimento ora appare QUI, subito dopo l'ultimo task */}
+                        {addingToDay === day && (
+                          <div className="inline-day-input-wrapper" onPointerDown={(e) => e.stopPropagation()}>
+                            <textarea
+                              className="inline-day-textarea"
+                              placeholder="Cosa devi fare?"
+                              value={inlineDayTask}
+                              autoFocus
+                              rows={2}
+                              onChange={(e) => {
+                                setInlineDayTask(e.target.value);
+                                setDetectedTime(parseTime(e.target.value));
+                              }}
+                              onBlur={() => handleAddTaskToDay(day)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleAddTaskToDay(day);
+                                }
+                                if (e.key === 'Escape') {
+                                  setAddingToDay(null);
+                                  setInlineDayTask("");
+                                  setDetectedTime(null);
+                                }
+                              }}
+                            />
+                            {detectedTime && (
+                              <div className="time-feedback-badge mini">
+                                ⏰ {detectedTime}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        
+                        {/* L'area cliccabile vuota serve solo a riempire il resto della colonna */}
+                        <div className="add-task-click-area"></div>
                       </div>
                     </DroppableContainer>
-                    {addingToDay === day ? (
-                      <div className="inline-day-input-wrapper">
-                        <textarea
-                          className="inline-day-textarea"
-                          placeholder="Scrivi e premi Invio..."
-                          value={inlineDayTask}
-                          autoFocus
-                          rows={2}
-                          onChange={(e) => setInlineDayTask(e.target.value)}
-                          onBlur={() => handleAddTaskToDay(day)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              handleAddTaskToDay(day);
-                            }
-                            if (e.key === 'Escape') {
-                              setAddingToDay(null);
-                              setInlineDayTask("");
-                            }
-                          }}
-                        />
-                      </div>
-                    ) : (
-                      <button
-                        className="day-add-btn-bottom"
-                        onPointerDown={(e) => e.stopPropagation()}
-                        onClick={(e) => { e.stopPropagation(); setAddingToDay(day); setInlineDayTask(""); }}
-                      >+ task</button>
-                    )}
                   </div>
                 );
               })}
               {isMobile && (
                 <div className="day-column mobile-backlog-column">
-                  <h3>MENU AZIONI 🚀</h3>
+                  <h3>MENU AZIONI 📓</h3>
                   <div className="mobile-action-center">
                     
                     <DroppableContainer id="archive-zone" className="action-btn-circ-wrapper" onClick={() => setShowArchiveModal(true)}>
                       <button className="action-btn-circ archive" title="Archivio" style={{ pointerEvents: "none" }}>
-                        <span className="icon">📝</span>
+                        <span className="icon">📝 </span>
                       </button>
                     </DroppableContainer>
 
@@ -629,7 +784,7 @@ function App() {
             <div className="backlog-sidebar">
               <div className="backlog-header">
                 <div className="left-group">
-                  <h2 className="backlog-title">Attività 📋</h2>
+                  <h2 className="backlog-title">Attività 📓</h2>
                   <button className="add-task-btn" onClick={() => setShowInput(true)}>➕</button>
                   <DroppableContainer
                     id="trash-zone"
@@ -641,8 +796,30 @@ function App() {
                   </DroppableContainer>
                 </div>
                 <div className="week-nav-buttons">
-                  <button onClick={prevWeek}>←</button>
-                  <button onClick={nextWeek}>→</button>
+                  <DroppableContainer 
+                    id="prev-week-btn" 
+                    className="nav-drop-zone"
+                    onClick={prevWeek}
+                  >
+                    <button className="nav-btn">←</button>
+                  </DroppableContainer>
+                  
+                  <DroppableContainer 
+                    id="next-week-btn" 
+                    className="nav-drop-zone"
+                    onClick={nextWeek}
+                  >
+                    <button className="nav-btn">→</button>
+                  </DroppableContainer>
+
+                  <button 
+                    className={`nav-status-btn ${pushStatus}`}
+                    onClick={subscribeToPush}
+                    title={`Stato Notifiche: ${pushStatus}`}
+                  >
+                    {pushStatus === 'granted' ? '🔔' : pushStatus === 'denied' ? '🔕' : '⏳'}
+                  </button>
+
                   <button className="logout-btn" onClick={handleLogout} title="Logout">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -656,24 +833,31 @@ function App() {
                 {[0, 1, 2].map((colIdx) => (
                   <DroppableContainer key={`Backlog-col-${colIdx}`} className="activity-column" id={`Backlog-col-${colIdx}`}>
                     {colIdx === 0 && showInput && (
-                      <textarea
-                        className="task-input"
-                        placeholder="Inserisci task..."
-                        value={newTask}
-                        onChange={(e) => {
-                          setNewTask(e.target.value);
-                          e.target.style.height = "auto";
-                          e.target.style.height = e.target.scrollHeight + "px";
-                        }}
-                        onBlur={handleAddTask}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            handleAddTask();
-                          }
-                        }}
-                        autoFocus
-                      />
+                      <div className="input-with-feedback">
+                        <textarea
+                          className="task-input"
+                          placeholder="Inserisci task..."
+                          value={newTask}
+                          autoFocus
+                          onChange={(e) => {
+                            setNewTask(e.target.value);
+                            setDetectedTime(parseTime(e.target.value));
+                            e.target.style.height = "auto";
+                            e.target.style.height = e.target.scrollHeight + "px";
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              handleAddTask();
+                            }
+                          }}
+                        />
+                        {detectedTime && (
+                          <div className="time-feedback-badge">
+                            ⏰ Promemoria impostato alle {detectedTime}
+                          </div>
+                        )}
+                      </div>
                     )}
                     <SortableContext items={columns[colIdx] || []} strategy={verticalListSortingStrategy}>
                       {columns[colIdx].map((t) => (
@@ -784,7 +968,7 @@ function App() {
       {isQuickAddOpen && (
         <div className="modal-overlay" onClick={() => setIsQuickAddOpen(false)}>
           <div className="modal-content glass" onClick={(e) => e.stopPropagation()}>
-            <h3>Nuova Attività ✏️</h3>
+            <h3>Nuova Attività 📝</h3>
             <textarea
               className="modal-textarea"
               placeholder="Cosa devi fare?"
@@ -792,8 +976,59 @@ function App() {
               onChange={(e) => setNewTask(e.target.value)}
               autoFocus
             />
+            <div className="time-picker-wrapper" style={{ marginTop: '15px' }}>
+              <label style={{ fontSize: '14px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '8px' }}>Seleziona Orario ⏰</label>
+              <div className="time-wheel-container">
+                <div className="time-wheel-center-bar"></div>
+                
+                {/* ORE */}
+                <div 
+                  className="time-wheel-column"
+                  onScroll={(e) => {
+                    const idx = Math.round(e.target.scrollTop / 40);
+                    const h = String(idx).padStart(2, '0');
+                    const m = newTaskTime.split(':')[1] || "00";
+                    setNewTaskTime(`${h}:${m}`);
+                  }}
+                >
+                  <div style={{ height: '40px' }} /> {/* Spacer */}
+                  {Array.from({ length: 24 }).map((_, i) => (
+                    <div key={i} className={`time-wheel-item ${newTaskTime.startsWith(String(i).padStart(2, '0')) ? 'active' : ''}`}>
+                      {String(i).padStart(2, '0')}
+                    </div>
+                  ))}
+                  <div style={{ height: '40px' }} /> {/* Spacer */}
+                </div>
+
+                <div style={{ fontWeight: 'bold', fontSize: '1.5rem' }}>:</div>
+
+                {/* MINUTI */}
+                <div 
+                  className="time-wheel-column"
+                  onScroll={(e) => {
+                    const idx = Math.round(e.target.scrollTop / 40);
+                    const m = String(idx).padStart(2, '0');
+                    const h = newTaskTime.split(':')[0] || "00";
+                    setNewTaskTime(`${h}:${m}`);
+                  }}
+                >
+                  <div style={{ height: '40px' }} /> {/* Spacer */}
+                  {Array.from({ length: 60 }).map((_, i) => (
+                    <div key={i} className={`time-wheel-item ${newTaskTime.endsWith(String(i).padStart(2, '0')) ? 'active' : ''}`}>
+                      {String(i).padStart(2, '0')}
+                    </div>
+                  ))}
+                  <div style={{ height: '40px' }} /> {/* Spacer */}
+                </div>
+              </div>
+              {newTaskTime && (
+                <div style={{ textAlign: 'center', marginTop: '10px', color: '#ff4d4f', fontWeight: 'bold' }}>
+                  Scelto: {newTaskTime}
+                </div>
+              )}
+            </div>
             <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => { setIsQuickAddOpen(false); setNewTask(""); }}>Annulla</button>
+              <button className="btn-cancel" onClick={() => { setIsQuickAddOpen(false); setNewTask(""); setNewTaskTime(""); }}>Annulla</button>
               <button className="btn-save" onClick={() => { handleAddTask(); setIsQuickAddOpen(false); }}>Salva</button>
             </div>
           </div>

@@ -6,14 +6,15 @@ __pycache__/
 venv/
 ENV/
 
-# Agenda Secrets (LOCAL ONLY)
+# Local migration and data scripts
+migra_dati.py
 Backend/auth_config.json
 Backend/tasks.json
 Backend/sessions.json
 
 # Node
 node_modules/
-# # dist/ (Removed to allow deployment via GitHub Desktop)
+dist/
 .DS_Store
 
 # IDE

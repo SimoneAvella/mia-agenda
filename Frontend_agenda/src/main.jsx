@@ -9,11 +9,12 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-// Registrazione Service Worker per PWA
+// Registrazione Service Worker per PWA (DISABILITATA TEMPORANEAMENTE PER PULIZIA CACHE)
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
-      .then(reg => console.log('Service Worker registrato con successo:', reg.scope))
-      .catch(err => console.log('Errore registrazione Service Worker:', err));
+  navigator.serviceWorker.getRegistrations().then(registrations => {
+    for (let registration of registrations) {
+      registration.unregister();
+      console.log('Service Worker rimosso per pulizia cache');
+    }
   });
 }

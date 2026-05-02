@@ -1,7 +1,9 @@
 import axios from "axios";
 
 // Determina se siamo in sviluppo o produzione
-const BASE_URL = import.meta.env.DEV ? "http://127.0.0.1:8000" : "";
+// Inserisci qui la tua URL di Render (es. https://mia-agenda.onrender.com)
+const RENDER_URL = "https://mia-agenda.onrender.com"; 
+const BASE_URL = import.meta.env.DEV ? RENDER_URL : "";
 
 // Configura axios per includere il token se presente
 const api = axios.create({
@@ -30,28 +32,29 @@ export async function loginStep2(password, code, remember) {
 }
 
 export async function checkAuth() {
-  const maxRetries = 6;
-  const retryDelay = 5000; // 5 secondi tra i tentativi
+  const token = localStorage.getItem("agenda_token");
+  if (!token) return false;
+
+  const maxRetries = 15; // 15 tentativi = circa 45-50 secondi di attesa risveglio
+  const retryDelay = 3000;
 
   for (let i = 0; i < maxRetries; i++) {
     try {
-      const res = await api.get(`/auth/check`);
+      // Usiamo un timeout breve per ogni tentativo per non bloccare tutto
+      const res = await api.get(`/auth/check`, { timeout: 5000 });
       return res.data.status === "ok";
     } catch (e) {
-      // Se è un errore 401 (non autorizzato), significa che il token è volutamente negato dal server.
-      // In questo caso non ha senso riprovare, l'utente DEVE loggare.
+      // Se il server risponde 401, il token è proprio scaduto. Esci.
       if (e.response && e.response.status === 401) {
         return false;
       }
 
-      // Se non è l'ultimo tentativo, attendiamo e riproviamo
+      // Se è un errore di rete o timeout, il server probabilmente sta dormendo.
       if (i < maxRetries - 1) {
-        console.log(`Server offline o in risveglio. Tentativo ${i + 1}/${maxRetries}...`);
+        console.log(`Risveglio server in corso... (${i + 1}/${maxRetries})`);
         await new Promise(r => setTimeout(r, retryDelay));
         continue;
       }
-      
-      // Se arriviamo qui, abbiamo esaurito i tentativi
       return false;
     }
   }

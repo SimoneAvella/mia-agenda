@@ -8,12 +8,19 @@ import hashlib
 import secrets
 import pyotp
 from datetime import datetime, timedelta
-from sqlalchemy import create_engine, Column, String, Boolean, DateTime
+from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+import threading
+import time
+from pywebpush import webpush, WebPushException
 
 # --- CONFIGURAZIONE ---
 DATABASE_URL = os.environ.get("DATABASE_URL")
+VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
+VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
+VAPID_CLAIMS = {"sub": "mailto:admin@agenda.it"}
+
 # Se siamo in locale e non c'è il DB, usiamo un fallback per lo sviluppo locale
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH")
 MFA_SECRET = os.environ.get("MFA_SECRET")
@@ -37,6 +44,12 @@ class TaskModel(Base):
     text = Column(String)
     done = Column(Boolean, default=False)
     col = Column(String)
+    time = Column(String, nullable=True) # Orario promemoria
+
+class SubscriptionModel(Base):
+    __tablename__ = "subscriptions"
+    endpoint = Column(String, primary_key=True)
+    subscription_info = Column(Text) # JSON con chiavi auth e p256dh
 
 class SessionModel(Base):
     __tablename__ = "sessions"
@@ -103,6 +116,8 @@ async def login(data: dict):
         if not verify_password(pwd, ADMIN_PASSWORD_HASH):
             print("LOGIN FALLITO: Password errata")
             raise HTTPException(status_code=401, detail="Password Errata")
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"ERRORE CRITTOGRAFIA: {e}")
         raise HTTPException(status_code=500, detail=f"Errore tecnico: {e}")
@@ -144,7 +159,76 @@ async def check_token(authorization: str = Header(None)):
     except:
         return {"status": "error"}
 
-# --- ENDPOINTS TASK ---
+# --- PROMEMORIA IN BACKGROUND ---
+def reminder_worker():
+    while True:
+        try:
+            if not DATABASE_URL:
+                time.sleep(60)
+                continue
+                
+            engine_worker = create_engine(DATABASE_URL)
+            SessionWorker = sessionmaker(bind=engine_worker)
+            db = SessionWorker()
+            
+            now = datetime.now()
+            currentTime = now.strftime("%H:%M")
+            todayStr = now.strftime("%Y-%m-%d")
+            
+            tasks = db.query(TaskModel).filter(
+                TaskModel.day == todayStr,
+                TaskModel.time == currentTime,
+                TaskModel.done == False
+            ).all()
+            
+            if tasks and VAPID_PRIVATE_KEY:
+                subscriptions = db.query(SubscriptionModel).all()
+                for t in tasks:
+                    for sub in subscriptions:
+                        try:
+                            webpush(
+                                subscription_info=json.loads(sub.subscription_info),
+                                data=json.dumps({
+                                    "title": "PROMEMORIA AGENTA 🚀",
+                                    "body": f"È l'ora di: {t.text}",
+                                    "icon": "/logo192.png"
+                                }),
+                                vapid_private_key=VAPID_PRIVATE_KEY,
+                                vapid_claims=VAPID_CLAIMS
+                            )
+                        except Exception:
+                            pass
+            db.close()
+        except Exception as e:
+            print(f"ERRORE REMINDER: {e}")
+        time.sleep(60)
+
+# Avvio thread
+if DATABASE_URL:
+    threading.Thread(target=reminder_worker, daemon=True).start()
+
+# --- ENDPOINT SOTTOSCRIZIONE ---
+@app.post("/subscribe")
+async def subscribe(data: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
+    endpoint = data.get("endpoint")
+    if not endpoint:
+        raise HTTPException(status_code=400, detail="Missing endpoint")
+    
+    sub = db.query(SubscriptionModel).filter(SubscriptionModel.endpoint == endpoint).first()
+    if not sub:
+        sub = SubscriptionModel(endpoint=endpoint, subscription_info=json.dumps(data))
+        db.add(sub)
+    else:
+        sub.subscription_info = json.dumps(data)
+    
+    db.commit()
+    return {"status": "ok"}
+
+@app.get("/vapid-public-key")
+async def get_vapid_key():
+    return {"publicKey": VAPID_PUBLIC_KEY}
+
+# --- ENDPOINTS TASK AGGIORNATI ---
 @app.get("/tasks")
 def get_tasks(db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     all_tasks = db.query(TaskModel).all()
@@ -156,7 +240,8 @@ def get_tasks(db: SessionLocal = Depends(get_db), auth: bool = Depends(check_aut
             "id": t.id,
             "text": t.text,
             "done": t.done,
-            "col": t.col
+            "col": t.col,
+            "time": t.time # Aggiunto orario
         })
     return result
 
@@ -171,7 +256,8 @@ def update_tasks(tasks_dict: dict, db: SessionLocal = Depends(get_db), auth: boo
                     day=day,
                     text=t.get("text", t.get("task", "")),
                     done=t.get("done", False),
-                    col=str(t.get("col", "0"))
+                    col=str(t.get("col", "0")),
+                    time=t.get("time") # Salviamo l'orario
                 )
                 db.add(new_task)
     db.commit()

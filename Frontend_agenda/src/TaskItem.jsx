@@ -54,7 +54,7 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
       style={style} 
       {...attributes} 
       {...(isEditing ? {} : listeners)}
-      className={task.done ? "task-item task-done" : "task-item"}
+      className={`task-item ${task.done ? "task-done" : ""} ${isDragging ? "is-dragging" : ""}`}
       onDoubleClick={() => { if (!task.done) setIsEditing(true); }}
       title={!task.done && !isEditing ? "Doppio clic per modificare" : ""}
     >
@@ -62,49 +62,54 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
         type="checkbox" 
         checked={task.done} 
         onChange={toggleDone}
-        onPointerDown={(e) => e.stopPropagation()} /* Keep checkbox clickable independent of drag */
-        style={{ marginTop: "1px", flexShrink: 0, cursor: "pointer" }} 
+        onPointerDown={(e) => e.stopPropagation()} 
+        style={{ marginTop: task.time ? "4px" : "1px", flexShrink: 0, cursor: "pointer" }} 
       />
       
-      {isEditing ? (
-        <textarea
-          ref={inputRef}
-          style={{ 
-            flex: 1, 
-            border: "none", 
-            padding: "0", 
-            resize: "none", 
-            overflow: "hidden", 
-            outline: "none", 
-            fontFamily: "inherit", 
-            fontSize: "inherit", 
-            lineHeight: "inherit",
-            background: "transparent",
-            marginLeft: "0px" 
-          }}
-          value={editText}
-          onChange={(e) => {
-            setEditText(e.target.value);
-          }}
-          onBlur={handleSave}
-          onPointerDown={(e) => e.stopPropagation()} 
-          onKeyDown={(e) => {
-            e.stopPropagation();
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleSave();
-            }
-            if (e.key === "Escape") {
-              setEditText(displayText);
-              setIsEditing(false);
-            }
-          }}
-        />
-      ) : (
-        <span style={{ marginLeft: "0px", flex: 1 }}>
-          {displayText}
-        </span>
-      )}
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, marginLeft: "0px" }}>
+        {task.time && !isEditing && (
+          <div className="task-time-header">
+            <span className="task-time-label">⏰ {task.time}</span>
+          </div>
+        )}
+        
+        {isEditing ? (
+          <textarea
+            ref={inputRef}
+            style={{ 
+              width: "100%",
+              border: "none", 
+              padding: "0", 
+              resize: "none", 
+              overflow: "hidden", 
+              outline: "none", 
+              fontFamily: "inherit", 
+              fontSize: "inherit", 
+              lineHeight: "inherit",
+              background: "transparent"
+            }}
+            value={editText}
+            onChange={(e) => setEditText(e.target.value)}
+            onBlur={handleSave}
+            onPointerDown={(e) => e.stopPropagation()} 
+            onKeyDown={(e) => {
+              e.stopPropagation();
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleSave();
+              }
+              if (e.key === "Escape") {
+                setEditText(displayText);
+                setIsEditing(false);
+              }
+            }}
+          />
+        ) : (
+          <span className="task-text-content">
+            {displayText}
+          </span>
+        )}
+      </div>
     </div>
   );
 }
