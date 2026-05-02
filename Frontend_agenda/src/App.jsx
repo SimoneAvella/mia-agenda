@@ -86,6 +86,15 @@ function App() {
   
   const [pushStatus, setPushStatus] = useState('pending'); // pending, granted, denied, error
 
+  // Funzione per calcolare il numero della settimana
+  const getWeekNumber = (d) => {
+    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
+    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+    const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+    return weekNo;
+  };
+
   // REGISTRAZIONE PUSH NOTIFICATIONS
   const subscribeToPush = async () => {
     try {
@@ -662,7 +671,7 @@ function App() {
           <h1 className="mobile-title">Agenda</h1>
           <div className="mobile-nav-controls">
             <button onClick={prevWeek}>←</button>
-            <span className="mobile-week-indicator">Sett. {getWeekNumber(currentDate)}</span>
+            <span className="mobile-week-indicator">Sett. {getWeekNumber(weekStart)}</span>
             <button onClick={nextWeek}>→</button>
           </div>
         </div>
