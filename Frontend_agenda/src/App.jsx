@@ -659,8 +659,10 @@ function App() {
     <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`}>
       {isMobile && (
         <div className="mobile-top-nav">
+          <h1 className="mobile-title">Agenda</h1>
           <div className="mobile-nav-controls">
             <button onClick={prevWeek}>←</button>
+            <span className="mobile-week-indicator">Sett. {getWeekNumber(currentDate)}</span>
             <button onClick={nextWeek}>→</button>
           </div>
         </div>
