@@ -173,7 +173,17 @@ async def check_auth(authorization: str = Header(None)):
 import bcrypt
 
 def verify_password(plain_password, hashed_password):
-    return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    # Se l'hash è lungo 64 caratteri, è probabilmente lo SHA256 locale
+    if len(hashed_password) == 64:
+        import hashlib
+        return hashlib.sha256(plain_password.encode()).hexdigest() == hashed_password
+    
+    # Altrimenti usa bcrypt (per Render)
+    import bcrypt
+    try:
+        return bcrypt.checkpw(plain_password.encode(), hashed_password.encode())
+    except:
+        return False
 
 # --- ENDPOINTS AUTH ---
 @app.post("/auth/login")
