@@ -21,9 +21,18 @@ VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
 VAPID_CLAIMS = {"sub": "mailto:admin@agenda.it"}
 
-# Se siamo in locale e non c'è il DB, usiamo un fallback per lo sviluppo locale
+# Se siamo in locale, carichiamo da auth_config.json
 ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH")
 MFA_SECRET = os.environ.get("MFA_SECRET")
+
+if not ADMIN_PASSWORD_HASH or not MFA_SECRET:
+    try:
+        with open(os.path.join(os.path.dirname(__file__), "auth_config.json"), "r") as f:
+            config = json.load(f)
+            if not ADMIN_PASSWORD_HASH: ADMIN_PASSWORD_HASH = config.get("password_hash")
+            if not MFA_SECRET: MFA_SECRET = config.get("totp_secret")
+    except:
+        print("AVVISO: auth_config.json non trovato o incompleto.")
 
 app = FastAPI()
 
@@ -56,24 +65,37 @@ class SessionModel(Base):
     token = Column(String, primary_key=True)
     expiry = Column(DateTime)
 
-if DATABASE_URL:
+# --- DATABASE SETUP ---
+Base = declarative_base()
+
+if not DATABASE_URL:
+    # Se non c'è il DB online, l'app segnala l'errore chiaramente
+    print("ERRORE: DATABASE_URL non impostato! Collegati a Render.")
+    # Fallback minimo per non far crashare il caricamento del modulo
+    engine = create_engine("sqlite:///:memory:") 
+else:
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    
     engine = create_engine(DATABASE_URL)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    
-    # Auto-riparazione database
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+# Auto-riparazione database online (per recuperare i task)
+if DATABASE_URL and "postgresql" in DATABASE_URL:
     from sqlalchemy import text
     with engine.connect() as conn:
         try:
             conn.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time VARCHAR;"))
             conn.commit()
-        except: pass
+            print("Database Online Riparato!")
+        except Exception as e:
+            print(f"Nota: {e}")
 
-    Base.metadata.create_all(bind=engine)
-else:
-    print("ATTENZIONE: DATABASE_URL non impostato!")
+Base.metadata.create_all(bind=engine)
+
+# Avvio thread promemoria per il cellulare
+if DATABASE_URL and VAPID_PRIVATE_KEY:
+    threading.Thread(target=reminder_worker, daemon=True).start()
 
 def get_db():
     db = SessionLocal()

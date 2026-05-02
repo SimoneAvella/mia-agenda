@@ -25,6 +25,10 @@ import {
 import DroppableContainer from "./DroppableContainer";
 import Login from "./Login";
 
+const API_BASE_URL = window.location.origin === 'http://localhost:5173' 
+  ? 'http://localhost:8088' 
+  : window.location.origin;
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
