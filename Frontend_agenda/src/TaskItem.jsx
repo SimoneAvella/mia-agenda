@@ -36,7 +36,8 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
     alignItems: "flex-start", 
     wordBreak: "break-word",
     transform: CSS.Translate.toString(transform),
-    transition
+    transition,
+    zIndex: isDragging ? 9999 : "auto"
   };
 
   const handleSave = () => {
@@ -54,7 +55,7 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
       style={style} 
       {...attributes} 
       {...(isEditing ? {} : listeners)}
-      className={`task-item ${task.done ? "task-done" : ""} ${isDragging ? "is-dragging" : ""}`}
+      className={`task-item ${task.done ? "task-done" : ""} ${isDragging ? "is-dragging" : ""}`.trim()}
       onDoubleClick={() => { if (!task.done) setIsEditing(true); }}
       title={!task.done && !isEditing ? "Doppio clic per modificare" : ""}
     >

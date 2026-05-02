@@ -111,25 +111,19 @@
 }
 
 /* Effetto comune per tutti i bersagli di rilascio (frecce, cestino, archivio) */
-.nav-drop-zone.droppable-active,
-#trash-zone.droppable-active,
-#archive-zone.droppable-active {
-  transform: scale(2.0) !important;
+.nav-drop-zone.is-over,
+#trash-zone.is-over,
+#archive-zone.is-over {
+  transform: scale(1.3) !important;
   z-index: 10000;
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
 }
 
-#trash-zone.droppable-active {
+#trash-zone.is-over {
   background: #fee2e2 !important;
   border-radius: 50%;
   box-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-}
-
-.nav-drop-zone.droppable-active button {
-  background: #3b82f6 !important;
-  color: white !important;
-  border-color: #2563eb !important;
-  box-shadow: 0 0 20px rgba(59, 130, 246, 0.6);
+  color: #ef4444 !important;
 }
 
 .nav-btn {
@@ -1258,4 +1252,48 @@
   0% { transform: scale(1); opacity: 0.5; }
   50% { transform: scale(1.1); opacity: 1; }
   100% { transform: scale(1); opacity: 0.5; }
+}
+
+.app-container.edge-active-left::before {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; bottom: 0; width: 40px;
+  background: linear-gradient(to right, rgba(59, 130, 246, 0.3), transparent);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.app-container.edge-active-right::after {
+  content: '';
+  position: fixed;
+  top: 0; right: 0; bottom: 0; width: 40px;
+  background: linear-gradient(to left, rgba(59, 130, 246, 0.3), transparent);
+  z-index: 9999;
+  pointer-events: none;
+}
+
+.trash-drop-zone.is-over {
+  transform: scale(1.4);
+  background: rgba(239, 68, 68, 0.2) !important;
+  border-color: #ef4444 !important;
+  transition: all 0.2s ease;
+}
+
+.nav-drop-zone.is-over {
+  transform: scale(1.2);
+  background: rgba(59, 130, 246, 0.2) !important;
+  border-color: #3b82f6 !important;
+  transition: all 0.2s ease;
+}
+
+/* Soluzione definitiva al doppione durante il drag */
+.task-item.is-dragging {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+.dragging-task-mirror .task-item {
+  opacity: 1 !important;
+  visibility: visible !important;
+  transform: none !important;
 }

@@ -9,7 +9,7 @@ export default function DroppableContainer({ id, className, children, disabled, 
   return (
     <div 
       ref={setNodeRef} 
-      className={`${className || ""} ${isOver ? "droppable-active" : ""}`.trim()} 
+      className={`${className || ""} ${isOver ? "is-over" : ""}`.trim()} 
       id={id}
       {...props}
     >
