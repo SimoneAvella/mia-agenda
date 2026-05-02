@@ -62,6 +62,15 @@ if DATABASE_URL:
     
     engine = create_engine(DATABASE_URL)
     SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    
+    # Auto-riparazione database
+    from sqlalchemy import text
+    with engine.connect() as conn:
+        try:
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS time VARCHAR;"))
+            conn.commit()
+        except: pass
+
     Base.metadata.create_all(bind=engine)
 else:
     print("ATTENZIONE: DATABASE_URL non impostato!")
