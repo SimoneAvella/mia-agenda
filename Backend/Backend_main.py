@@ -93,6 +93,50 @@ if DATABASE_URL and "postgresql" in DATABASE_URL:
 
 Base.metadata.create_all(bind=engine)
 
+# --- PROMEMORIA IN BACKGROUND ---
+def reminder_worker():
+    while True:
+        try:
+            if not DATABASE_URL:
+                time.sleep(60)
+                continue
+                
+            engine_worker = create_engine(DATABASE_URL)
+            SessionWorker = sessionmaker(bind=engine_worker)
+            db = SessionWorker()
+            
+            now = datetime.now()
+            currentTime = now.strftime("%H:%M")
+            todayStr = now.strftime("%Y-%m-%d")
+            
+            tasks = db.query(TaskModel).filter(
+                TaskModel.day == todayStr,
+                TaskModel.time == currentTime,
+                TaskModel.done == False
+            ).all()
+            
+            if tasks and VAPID_PRIVATE_KEY:
+                subscriptions = db.query(SubscriptionModel).all()
+                for t in tasks:
+                    for sub in subscriptions:
+                        try:
+                            webpush(
+                                subscription_info=json.loads(sub.subscription_info),
+                                data=json.dumps({
+                                    "title": "PROMEMORIA AGENTA 🚀",
+                                    "body": f"È l'ora di: {t.text}",
+                                    "icon": "/logo192.png"
+                                }),
+                                vapid_private_key=VAPID_PRIVATE_KEY,
+                                vapid_claims=VAPID_CLAIMS
+                            )
+                        except Exception:
+                            pass
+            db.close()
+        except Exception as e:
+            print(f"ERRORE REMINDER: {e}")
+        time.sleep(60)
+
 # Avvio thread promemoria per il cellulare
 if DATABASE_URL and VAPID_PRIVATE_KEY:
     threading.Thread(target=reminder_worker, daemon=True).start()
@@ -189,54 +233,6 @@ async def check_token(authorization: str = Header(None)):
         return {"status": "ok"}
     except:
         return {"status": "error"}
-
-# --- PROMEMORIA IN BACKGROUND ---
-def reminder_worker():
-    while True:
-        try:
-            if not DATABASE_URL:
-                time.sleep(60)
-                continue
-                
-            engine_worker = create_engine(DATABASE_URL)
-            SessionWorker = sessionmaker(bind=engine_worker)
-            db = SessionWorker()
-            
-            now = datetime.now()
-            currentTime = now.strftime("%H:%M")
-            todayStr = now.strftime("%Y-%m-%d")
-            
-            tasks = db.query(TaskModel).filter(
-                TaskModel.day == todayStr,
-                TaskModel.time == currentTime,
-                TaskModel.done == False
-            ).all()
-            
-            if tasks and VAPID_PRIVATE_KEY:
-                subscriptions = db.query(SubscriptionModel).all()
-                for t in tasks:
-                    for sub in subscriptions:
-                        try:
-                            webpush(
-                                subscription_info=json.loads(sub.subscription_info),
-                                data=json.dumps({
-                                    "title": "PROMEMORIA AGENTA 🚀",
-                                    "body": f"È l'ora di: {t.text}",
-                                    "icon": "/logo192.png"
-                                }),
-                                vapid_private_key=VAPID_PRIVATE_KEY,
-                                vapid_claims=VAPID_CLAIMS
-                            )
-                        except Exception:
-                            pass
-            db.close()
-        except Exception as e:
-            print(f"ERRORE REMINDER: {e}")
-        time.sleep(60)
-
-# Avvio thread
-if DATABASE_URL:
-    threading.Thread(target=reminder_worker, daemon=True).start()
 
 # --- ENDPOINT SOTTOSCRIZIONE ---
 @app.post("/subscribe")
