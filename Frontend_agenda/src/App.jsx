@@ -689,14 +689,6 @@ function App() {
             <h1>Agenda Personale</h1>
           </div>
           <div className="header-right">
-            <button 
-              className={`nav-status-btn ${pushStatus}`}
-              onClick={subscribeToPush}
-              title={`Stato Notifiche: ${pushStatus}`}
-              style={{ marginRight: '15px', fontSize: '1.4rem' }}
-            >
-              {pushStatus === 'granted' ? '🔔' : pushStatus === 'denied' ? '🔕' : '⏳'}
-            </button>
             <button className="logout-btn" onClick={handleLogout}>
               Logout
             </button>
@@ -834,6 +826,14 @@ function App() {
                     <button className="nav-btn">→</button>
                   </DroppableContainer>
 
+                  <button 
+                    className={`nav-status-btn ${pushStatus}`}
+                    onClick={subscribeToPush}
+                    title={`Stato Notifiche: ${pushStatus}`}
+                    style={{ marginRight: '10px' }}
+                  >
+                    {pushStatus === 'granted' ? '🔔' : pushStatus === 'denied' ? '🔕' : '⏳'}
+                  </button>
                   <button className="logout-btn" onClick={handleLogout} title="Logout">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
