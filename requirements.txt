@@ -10,3 +10,5 @@ python-dotenv
 passlib[bcrypt]
 bcrypt
 pywebpush
+pywebpush
+cryptography
