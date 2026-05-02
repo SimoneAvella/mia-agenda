@@ -684,6 +684,24 @@ function App() {
         </DragOverlay>,
         document.body
       )}
+        <header className="app-header">
+          <div className="header-left">
+            <h1>Agenda Personale</h1>
+          </div>
+          <div className="header-right">
+            <button 
+              className={`nav-status-btn ${pushStatus}`}
+              onClick={subscribeToPush}
+              title={`Stato Notifiche: ${pushStatus}`}
+              style={{ marginRight: '15px', fontSize: '1.4rem' }}
+            >
+              {pushStatus === 'granted' ? '🔔' : pushStatus === 'denied' ? '🔕' : '⏳'}
+            </button>
+            <button className="logout-btn" onClick={handleLogout}>
+              Logout
+            </button>
+          </div>
+        </header>
         <div className="main-layout">
           <div className="calendar-section">
             <div 
@@ -815,14 +833,6 @@ function App() {
                   >
                     <button className="nav-btn">→</button>
                   </DroppableContainer>
-
-                  <button 
-                    className={`nav-status-btn ${pushStatus}`}
-                    onClick={subscribeToPush}
-                    title={`Stato Notifiche: ${pushStatus}`}
-                  >
-                    {pushStatus === 'granted' ? '🔔' : pushStatus === 'denied' ? '🔕' : '⏳'}
-                  </button>
 
                   <button className="logout-btn" onClick={handleLogout} title="Logout">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
