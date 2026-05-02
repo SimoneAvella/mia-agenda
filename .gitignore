@@ -14,7 +14,6 @@ Backend/sessions.json
 
 # Node
 node_modules/
-dist/
 .DS_Store
 
 # IDE
