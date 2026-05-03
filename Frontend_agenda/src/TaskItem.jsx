@@ -30,6 +30,7 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
 
   const style = {
     opacity: isDragging ? 0 : 1, 
+    visibility: isDragging ? "hidden" : "visible",
     cursor: isEditing ? "text" : "grab",
     position: "relative",
     display: "flex",
@@ -37,7 +38,8 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
     wordBreak: "break-word",
     transform: CSS.Translate.toString(transform),
     transition,
-    zIndex: isDragging ? 9999 : "auto"
+    zIndex: isDragging ? 9999 : "auto",
+    pointerEvents: isDragging ? "none" : "auto"
   };
 
   const handleSave = () => {

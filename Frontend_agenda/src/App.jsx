@@ -1,10 +1,13 @@
 // BUILD_TEST_12345
 import './App.css';
-import { useEffect, useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+
+// Feature flag: enable drag‑to‑edge week switching on mobile devices
+const ENABLE_WEEK_EDGE_DRAG = true; // set to false to disable
 import { createPortal } from "react-dom";
 import { getWeekDates, getTodayString } from "./utils/dates";
 import TaskItem from "./TaskItem";
-import { getTasks, updateTasks, moveTaskAPI, checkAuth, logout } from "./api";
+import { getTasks, updateTasks, moveTaskAPI, checkAuth, logout, API_BASE_URL } from "./api";
 import {
   DndContext,
   PointerSensor,
@@ -26,13 +29,16 @@ import DroppableContainer from "./DroppableContainer";
 import Login from "./Login";
 
 function App() {
+  // Ref to store the X coordinate where the drag started (for desktop testing)
+  const dragStartX = useRef(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [weekStart, setWeekStart] = useState(new Date());
   const [days, setDays] = useState([]);
   const [tasks, setTasks] = useState({ Backlog: [] });
   const [showInput, setShowInput] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(('ontouchstart' in window) || window.innerWidth <= 768);
+
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
   const [newTask, setNewTask] = useState("");
   const [showTrashModal, setShowTrashModal] = useState(false);
@@ -41,6 +47,10 @@ function App() {
   const [movingTaskId, setMovingTaskId] = useState(null);
   const [isDraggingFromBacklog, setIsDraggingFromBacklog] = useState(false);
   const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null
+  const [edgeTimer, setEdgeTimer] = useState(null);
+  const EDGE_TIMEOUT = 1200; // ms, aumentato per evitare cambi accidentali
+  const EDGE_THRESHOLD = 30; // px from screen edge
+
   const [addingToDay, setAddingToDay] = useState(null); // which day column is open for inline add
   const [inlineDayTask, setInlineDayTask] = useState(""); // text in the inline input
   const [newTaskTime, setNewTaskTime] = useState(""); // time for the new task being added
@@ -151,8 +161,13 @@ function App() {
     }
     initAuth();
 
-    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    const handleResize = () => {
+      const mobile = ('ontouchstart' in window) || window.innerWidth <= 768;
+      setIsMobile(mobile);
+      if (ENABLE_WEEK_EDGE_DRAG && !mobile) setIsMobile(true);
+    };
     window.addEventListener('resize', handleResize);
+    handleResize(); // Initial check
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
@@ -382,6 +397,9 @@ function App() {
   };
 
   const handleDragStart = (event) => {
+    // Store initial X coordinate using activatorEvent (more reliable)
+    dragStartX.current = event.activatorEvent?.clientX || 0;
+    // Existing logic follows
     const { active } = event;
     let foundTask = null;
     let foundDay = null;
@@ -404,30 +422,39 @@ function App() {
   };
 
   const handleDragMove = (event) => {
-    const { over } = event;
-    
-    // Gestione dei Portali Droppable (Frecce)
-    const overId = over?.id;
-    let currentEdge = null;
-    if (overId === 'prev-week-btn') currentEdge = 'left';
-    else if (overId === 'next-week-btn') currentEdge = 'right';
-    
-    if (currentEdge !== activeEdgeRef.current) {
-      if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
-      activeEdgeRef.current = currentEdge;
-      setDraggingEdge(currentEdge);
+    if (!ENABLE_WEEK_EDGE_DRAG) return;
 
-      if (currentEdge) {
+    const { over } = event;
+    const deltaX = event?.delta?.x ?? 0;
+    const pointerX = (dragStartX.current !== null ? dragStartX.current : 0) + deltaX;
+    const viewportWidth = window.innerWidth;
+
+    let edge = null;
+
+    // 1. Check if over a droppable button (explicit drop zone)
+    if (over?.id === 'prev-week-btn') edge = 'left';
+    else if (over?.id === 'next-week-btn') edge = 'right';
+    
+    // 2. If not over a button, check screen edges (hover zone)
+    if (!edge) {
+      if (pointerX <= EDGE_THRESHOLD) edge = 'left';
+      else if (pointerX >= viewportWidth - EDGE_THRESHOLD) edge = 'right';
+    }
+
+    if (edge !== activeEdgeRef.current) {
+      if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
+      activeEdgeRef.current = edge;
+      setDraggingEdge(edge);
+      
+      if (edge) {
         weekTimerRef.current = setTimeout(() => {
-          const now = Date.now();
-          if (now - lastWeekChangeRef.current > 1200) {
-            if (activeEdgeRef.current === 'left') prevWeek();
-            else if (activeEdgeRef.current === 'right') nextWeek();
-            lastWeekChangeRef.current = now;
-          }
+          if (activeEdgeRef.current === 'left') prevWeek();
+          else if (activeEdgeRef.current === 'right') nextWeek();
+          
+          // Reset after switch
           setDraggingEdge(null);
           activeEdgeRef.current = null;
-        }, 1200);
+        }, EDGE_TIMEOUT);
       }
     }
   };
@@ -455,6 +482,14 @@ function App() {
   };
 
   const handleDragEnd = async (event) => {
+    // Cleanup any pending timers and reset edge state
+    if (edgeTimer) clearTimeout(edgeTimer);
+    setEdgeTimer(null);
+    setDraggingEdge(null);
+    if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
+    activeEdgeRef.current = null;
+    dragStartX.current = null;
+
     setActiveTask(null);
     setIsDraggingFromBacklog(false);
     if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
@@ -640,7 +675,7 @@ function App() {
   };
 
   return (
-    <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`}>
+    <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`} >
       {isMobile && (
         <div className="mobile-top-nav">
           <span className="mobile-title">Calendario 🗓️</span>
@@ -1033,6 +1068,18 @@ function App() {
           ) : null}
         </DragOverlay>,
         document.body
+      )}
+
+      {/* Edge Portals for Visual Feedback during drag */}
+      {draggingEdge === 'left' && (
+        <div className="week-portal left active">
+          <span>PRECEDENTE</span>
+        </div>
+      )}
+      {draggingEdge === 'right' && (
+        <div className="week-portal right active">
+          <span>SUCCESSIVA</span>
+        </div>
       )}
 
     </div>

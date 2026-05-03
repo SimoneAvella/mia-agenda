@@ -1,9 +1,8 @@
 import axios from "axios";
 
 // Determina se siamo in sviluppo o produzione
-// Inserisci qui la tua URL di Render (es. https://mia-agenda.onrender.com)
-const RENDER_URL = "https://mia-agenda.onrender.com"; 
-const BASE_URL = import.meta.env.DEV ? RENDER_URL : "";
+export const API_BASE_URL = "https://mia-agenda.onrender.com";
+export const BASE_URL = import.meta.env.DEV ? API_BASE_URL : "";
 
 // Configura axios per includere il token se presente
 const api = axios.create({
