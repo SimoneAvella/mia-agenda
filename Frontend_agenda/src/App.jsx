@@ -432,22 +432,12 @@ function App() {
     if (!ENABLE_WEEK_EDGE_DRAG) return;
 
     const { over } = event;
-    const deltaX = event?.delta?.x ?? 0;
-    const pointerX = (dragStartX.current !== null ? dragStartX.current : 0) + deltaX;
-    const viewportWidth = window.innerWidth;
-
     let edge = null;
 
-    // 1. Check if over a droppable button (explicit drop zone)
-    if (over?.id === 'prev-week-btn') edge = 'left';
-    else if (over?.id === 'next-week-btn') edge = 'right';
+    // Detect edge from droppable ID (more reliable than coordinates on mobile)
+    if (over?.id === 'prev-week-btn' || over?.id === 'edge-left') edge = 'left';
+    else if (over?.id === 'next-week-btn' || over?.id === 'edge-right') edge = 'right';
     
-    // 2. If not over a button, check screen edges (hover zone)
-    if (!edge) {
-      if (pointerX <= EDGE_THRESHOLD) edge = 'left';
-      else if (pointerX >= viewportWidth - EDGE_THRESHOLD) edge = 'right';
-    }
-
     if (edge !== activeEdgeRef.current) {
       if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
       activeEdgeRef.current = edge;
@@ -641,48 +631,33 @@ function App() {
     const { active, droppableContainers } = args;
     if (!active) return [];
 
-    if (isDraggingFromBacklog) {
-      // Prioritize Day columns, Action zones, and its own Backlog container
-      const filteredTargets = droppableContainers.filter(c => 
-        days.includes(c.id) || c.id === "trash-zone" || c.id === "archive-zone" || c.id === "Backlog"
-      );
-      
-      const collisions = pointerWithin({
-        ...args,
-        droppableContainers: filteredTargets
-      });
-
-      if (collisions.length > 0) return collisions;
-      
-      // Rect intersection as a fallback only for the filtered targets
-      return rectIntersection({
-        ...args,
-        droppableContainers: filteredTargets
-      });
-    }
-
     const pointerCollisions = pointerWithin(args);
-    if (pointerCollisions.length > 0) {
-      // Prioritize Trash and Archive Zones
-      const trash = pointerCollisions.find(c => c.id === "trash-zone");
-      if (trash) return [trash];
-      const archive = pointerCollisions.find(c => c.id === "archive-zone");
-      if (archive) return [archive];
+    
+    // 1. ALWAYS Prioritize "System" Targets (Trash, Archive, Arrows, Edges)
+    const systemCollision = pointerCollisions.find(c => 
+      c.id === 'trash-zone' || c.id === 'archive-zone' || 
+      c.id === 'prev-week-btn' || c.id === 'next-week-btn' ||
+      c.id === 'edge-left' || c.id === 'edge-right'
+    );
+    if (systemCollision) return [systemCollision];
 
-      // If dragging FROM archive, prioritize days
-      if (activeTask && activeTask.currentDay === "Backlog") {
-        const day = pointerCollisions.find(c => days.includes(c.id));
-        if (day) return [day];
-      }
-      return pointerCollisions;
+    // 2. If dragging FROM backlog, prioritize Days
+    if (isDraggingFromBacklog) {
+      const dayCollision = pointerCollisions.find(c => days.includes(c.id));
+      if (dayCollision) return [dayCollision];
     }
 
-    // Fallback to rectIntersection only if pointer is not over anything
+    // 3. Fallback to all pointer collisions or rectIntersection
+    if (pointerCollisions.length > 0) return pointerCollisions;
     return rectIntersection(args);
   };
 
   return (
     <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`} >
+      {/* Invisible Droppable Edges */}
+      <DroppableContainer id="edge-left" className="edge-drop-zone left" />
+      <DroppableContainer id="edge-right" className="edge-drop-zone right" />
+      
       {isMobile && (
         <div className="mobile-top-nav">
           <span className="mobile-title">Calendario 🗓️</span>
