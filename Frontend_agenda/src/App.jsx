@@ -670,16 +670,6 @@ function App() {
           } 
         }}
       >
-        {createPortal(
-        <DragOverlay className="dragging-task-mirror">
-          {activeTask ? (
-            <div className="dragging-task-mirror">
-              <TaskItem task={activeTask} toggleDone={() => {}} editTaskText={() => {}} />
-            </div>
-          ) : null}
-        </DragOverlay>,
-        document.body
-      )}
         <div className="main-layout">
           <div className="calendar-section">
             <div 
@@ -1033,6 +1023,17 @@ function App() {
             </div>
           </div>
         </div>
+      )}
+
+      {createPortal(
+        <DragOverlay dropAnimation={null} zIndex={9999}>
+          {activeTask ? (
+            <div className="dragging-task-mirror">
+               <TaskItem task={activeTask} toggleDone={() => {}} editTaskText={() => {}} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body
       )}
 
     </div>
