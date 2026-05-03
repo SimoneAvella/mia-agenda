@@ -697,13 +697,12 @@ function App() {
                       >
                         <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                           {tasks[day]?.map((t) => (
-                            <div key={t.id || t.task} onPointerDown={(e) => e.stopPropagation()}>
-                              <TaskItem
-                                task={t}
-                                toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
-                                editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
-                              />
-                            </div>
+                            <TaskItem
+                              key={t.id || t.task}
+                              task={t}
+                              toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
+                              editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
+                            />
                           ))}
                         </SortableContext>
 
@@ -866,30 +865,8 @@ function App() {
           )}
         </div>
 
-        <DragOverlay dropAnimation={null} zIndex={9999}>
-          {activeTask ? (
-            <div 
-              className="task-item" 
-              style={{ 
-                width: "160px",
-                background: "white",
-                opacity: 1,
-                cursor: "grabbing", 
-                boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
-                border: "2px solid black",
-                borderRadius: "6px",
-                padding: "8px",
-                fontWeight: "500",
-                display: "flex",
-                alignItems: "center",
-                gap: "4px",
-              }}
-            >
-               <input type="checkbox" checked={activeTask.done} readOnly style={{ marginRight: "4px" }} />
-               <span style={{ fontSize: "14px" }}>{activeTask.text || activeTask.task}</span>
-            </div>
-          ) : null}
-        </DragOverlay>
+          )}
+        </div>
 
         {showTrashModal && (
           <div className="trash-modal-overlay" onClick={() => setShowTrashModal(false)}>
@@ -1017,6 +994,24 @@ function App() {
                 </div>
               )}
             </div>
+            <div className="modal-actions">
+              <button className="btn-cancel" onClick={() => { setIsQuickAddOpen(false); setNewTask(""); setNewTaskTime(""); }}>Annulla</button>
+              <button className="btn-save" onClick={() => { handleAddTask(); setIsQuickAddOpen(false); }}>Salva</button>
+      {createPortal(
+        <DragOverlay dropAnimation={null} zIndex={9999}>
+          {activeTask ? (
+            <div className="dragging-task-mirror">
+               <TaskItem task={activeTask} toggleDone={() => {}} editTaskText={() => {}} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body
+      )}
+    </div>
+  );
+}
+
+export default App;
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => { setIsQuickAddOpen(false); setNewTask(""); setNewTaskTime(""); }}>Annulla</button>
               <button className="btn-save" onClick={() => { handleAddTask(); setIsQuickAddOpen(false); }}>Salva</button>
