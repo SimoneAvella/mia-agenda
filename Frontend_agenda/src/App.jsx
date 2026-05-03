@@ -25,10 +25,6 @@ import {
 import DroppableContainer from "./DroppableContainer";
 import Login from "./Login";
 
-const API_BASE_URL = window.location.origin === 'http://localhost:5173' 
-  ? 'http://localhost:8088' 
-  : window.location.origin;
-
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
@@ -86,15 +82,6 @@ function App() {
   
   const [pushStatus, setPushStatus] = useState('pending'); // pending, granted, denied, error
 
-  // Funzione per calcolare il numero della settimana
-  const getWeekNumber = (d) => {
-    const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-    date.setUTCDate(date.getUTCDate() + 4 - (date.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
-    const weekNo = Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
-    return weekNo;
-  };
-
   // REGISTRAZIONE PUSH NOTIFICATIONS
   const subscribeToPush = async () => {
     try {
@@ -137,7 +124,6 @@ function App() {
   const weekTimerRef = useRef(null);
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
-  const edgeTimerRef = useRef(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -186,12 +172,12 @@ function App() {
     if (isAuthenticated) {
       async function fetchTasks() {
         const data = await getTasks();
+        // Guaranteed Unique IDs: combine day, text and index to avoid any collision
         const normalized = {};
         Object.keys(data).forEach(day => {
           normalized[day] = data[day].map((t, i) => ({
             ...t,
-            // ID univoco garantito: priorità a quello del DB, altrimenti ne creiamo uno atomico
-            id: String(t.id || `task-${day}-${i}-${t.task}-${Date.now()}`)
+            id: String(t.id || `task-${day}-${i}-${Date.now()}`)
           }));
         });
         setTasks(normalized);
@@ -333,9 +319,9 @@ function App() {
       setDetectedTime(null);
       return;
     }
-    const cleanedText = stripTime(newTask);
-    const newId = `new-${Date.now()}-${cleanedText.substring(0, 10)}`;
+    const newId = Date.now().toString();
     const timeToSet = detectedTime || parseTime(newTask);
+    const cleanedText = stripTime(newTask); // Puliamo il testo!
     
     const updatedTasks = {
       ...tasks,
@@ -417,6 +403,35 @@ function App() {
     }
   };
 
+  const handleDragMove = (event) => {
+    const { over } = event;
+    
+    // Gestione dei Portali Droppable (Frecce)
+    const overId = over?.id;
+    let currentEdge = null;
+    if (overId === 'prev-week-btn') currentEdge = 'left';
+    else if (overId === 'next-week-btn') currentEdge = 'right';
+    
+    if (currentEdge !== activeEdgeRef.current) {
+      if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
+      activeEdgeRef.current = currentEdge;
+      setDraggingEdge(currentEdge);
+
+      if (currentEdge) {
+        weekTimerRef.current = setTimeout(() => {
+          const now = Date.now();
+          if (now - lastWeekChangeRef.current > 1200) {
+            if (activeEdgeRef.current === 'left') prevWeek();
+            else if (activeEdgeRef.current === 'right') nextWeek();
+            lastWeekChangeRef.current = now;
+          }
+          setDraggingEdge(null);
+          activeEdgeRef.current = null;
+        }, 1200);
+      }
+    }
+  };
+
   const handleTouchStart = (e) => {
     if (activeTask) return;
     touchStartX.current = e.touches[0].clientX;
@@ -439,55 +454,15 @@ function App() {
     touchStartY.current = null;
   };
 
-  const handleDragMove = (event) => {
-    const { delta, active, over } = event;
-    if (!active) return;
-
-    // 1. Gestione dei Portali Droppable (Frecce esistenti)
-    const overId = over?.id;
-    let currentEdge = null;
-    if (overId === 'prev-week-btn') currentEdge = 'left';
-    else if (overId === 'next-week-btn') currentEdge = 'right';
-
-    // 2. Gestione Trascinamento ai Bordi (Nuova funzione)
-    const pointerX = (event.activatorEvent?.clientX || (event.activatorEvent?.touches && event.activatorEvent.touches[0].clientX) || 0) + (delta?.x || 0);
-    const threshold = 40; 
-    const screenWidth = window.innerWidth;
-
-    if (pointerX < threshold || currentEdge === 'left') {
-      const targetEdge = 'left';
-      if (draggingEdge !== targetEdge) {
-        setDraggingEdge(targetEdge);
-        clearTimeout(edgeTimerRef.current);
-        edgeTimerRef.current = setTimeout(() => {
-          prevWeek();
-          setDraggingEdge(null);
-        }, 1000); 
-      }
-    } else if (pointerX > screenWidth - threshold || currentEdge === 'right') {
-      const targetEdge = 'right';
-      if (draggingEdge !== targetEdge) {
-        setDraggingEdge(targetEdge);
-        clearTimeout(edgeTimerRef.current);
-        edgeTimerRef.current = setTimeout(() => {
-          nextWeek();
-          setDraggingEdge(null);
-        }, 1000);
-      }
-    } else {
-      if (draggingEdge) {
-        setDraggingEdge(null);
-        clearTimeout(edgeTimerRef.current);
-      }
-    }
-  };
-
   const handleDragEnd = async (event) => {
-    setDraggingEdge(null);
-    clearTimeout(edgeTimerRef.current);
     setActiveTask(null);
     setIsDraggingFromBacklog(false);
+    if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
+    activeEdgeRef.current = null;
     
+    // Auto-close archive when a drop happens (successful or not)
+    if (showArchiveModal) setShowArchiveModal(false);
+
     const { active, over } = event;
     if (!over) return;
 
@@ -668,11 +643,17 @@ function App() {
     <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`}>
       {isMobile && (
         <div className="mobile-top-nav">
-          <h1 className="mobile-title">Agenda</h1>
+          <span className="mobile-title">Calendario 🗓️</span>
           <div className="mobile-nav-controls">
             <button onClick={prevWeek}>←</button>
-            <span className="mobile-week-indicator">Sett. {getWeekNumber(weekStart)}</span>
             <button onClick={nextWeek}>→</button>
+            <button className="logout-btn" onClick={handleLogout} title="Logout">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+            </button>
           </div>
         </div>
       )}
@@ -689,6 +670,16 @@ function App() {
           } 
         }}
       >
+        {createPortal(
+        <DragOverlay className="dragging-task-mirror">
+          {activeTask ? (
+            <div className="dragging-task-mirror">
+              <TaskItem task={activeTask} toggleDone={() => {}} editTaskText={() => {}} />
+            </div>
+          ) : null}
+        </DragOverlay>,
+        document.body
+      )}
         <div className="main-layout">
           <div className="calendar-section">
             <div 
@@ -714,17 +705,15 @@ function App() {
                           setDetectedTime(null);
                         }}
                       >
-                        <SortableContext 
-                          items={tasks[day]?.map(t => String(t.id || t.task)) || []} 
-                          strategy={verticalListSortingStrategy}
-                        >
+                        <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                           {tasks[day]?.map((t) => (
-                            <TaskItem
-                              key={String(t.id || t.task)}
-                              task={t}
-                              toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
-                              editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
-                            />
+                            <div key={t.id || t.task} onPointerDown={(e) => e.stopPropagation()}>
+                              <TaskItem
+                                task={t}
+                                toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
+                                editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
+                              />
+                            </div>
                           ))}
                         </SortableContext>
 
@@ -814,6 +803,7 @@ function App() {
                   >
                     <button className="nav-btn">←</button>
                   </DroppableContainer>
+                  
                   <DroppableContainer 
                     id="next-week-btn" 
                     className="nav-drop-zone"
@@ -826,9 +816,16 @@ function App() {
                     className={`nav-status-btn ${pushStatus}`}
                     onClick={subscribeToPush}
                     title={`Stato Notifiche: ${pushStatus}`}
-                    style={{ marginRight: '10px' }}
                   >
                     {pushStatus === 'granted' ? '🔔' : pushStatus === 'denied' ? '🔕' : '⏳'}
+                  </button>
+
+                  <button className="logout-btn" onClick={handleLogout} title="Logout">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                      <polyline points="16 17 21 12 16 7" />
+                      <line x1="21" y1="12" x2="9" y2="12" />
+                    </svg>
                   </button>
                 </div>
               </div>
@@ -862,13 +859,10 @@ function App() {
                         )}
                       </div>
                     )}
-                    <SortableContext 
-                      items={columns[colIdx].map(t => String(t.id || t.task))} 
-                      strategy={verticalListSortingStrategy}
-                    >
+                    <SortableContext items={columns[colIdx] || []} strategy={verticalListSortingStrategy}>
                       {columns[colIdx].map((t) => (
                         <TaskItem
-                          key={String(t.id || t.task)}
+                          key={t.id || t.task}
                           task={t}
                           toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)}
                           editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)}
@@ -885,24 +879,24 @@ function App() {
         <DragOverlay dropAnimation={null} zIndex={9999}>
           {activeTask ? (
             <div 
-              className="task-item dragging-mirror" 
+              className="task-item" 
               style={{ 
-                width: "250px", // Più largo e leggibile
+                width: "160px",
                 background: "white",
                 opacity: 1,
                 cursor: "grabbing", 
-                boxShadow: "0 10px 30px rgba(0,0,0,0.3)",
-                border: "2px solid #3b82f6",
-                borderRadius: "8px",
-                padding: "10px",
+                boxShadow: "0 25px 50px rgba(0,0,0,0.5)",
+                border: "2px solid black",
+                borderRadius: "6px",
+                padding: "8px",
                 fontWeight: "500",
                 display: "flex",
                 alignItems: "center",
-                gap: "8px",
+                gap: "4px",
               }}
             >
-               <input type="checkbox" checked={activeTask.done} readOnly />
-               <span style={{ fontSize: "14px", color: "#1e293b" }}>{activeTask.text || activeTask.task}</span>
+               <input type="checkbox" checked={activeTask.done} readOnly style={{ marginRight: "4px" }} />
+               <span style={{ fontSize: "14px" }}>{activeTask.text || activeTask.task}</span>
             </div>
           ) : null}
         </DragOverlay>
