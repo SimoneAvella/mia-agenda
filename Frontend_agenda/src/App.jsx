@@ -631,10 +631,13 @@ function App() {
     const { active, droppableContainers } = args;
     if (!active) return [];
 
-    const pointerCollisions = pointerWithin(args);
-    
     // 1. ALWAYS Prioritize "System" Targets (Trash, Archive, Arrows, Edges)
-    const systemCollision = pointerCollisions.find(c => 
+    // Use BOTH pointer and rect intersection for maximum reliability on mobile
+    const pointerCollisions = pointerWithin(args);
+    const rectCollisions = rectIntersection(args);
+    const allCollisions = [...pointerCollisions, ...rectCollisions];
+
+    const systemCollision = allCollisions.find(c => 
       c.id === 'trash-zone' || c.id === 'archive-zone' || 
       c.id === 'prev-week-btn' || c.id === 'next-week-btn' ||
       c.id === 'edge-left' || c.id === 'edge-right'
@@ -643,18 +646,18 @@ function App() {
 
     // 2. If dragging FROM backlog, prioritize Days
     if (isDraggingFromBacklog) {
-      const dayCollision = pointerCollisions.find(c => days.includes(c.id));
+      const dayCollision = allCollisions.find(c => days.includes(c.id));
       if (dayCollision) return [dayCollision];
     }
 
-    // 3. Fallback to all pointer collisions or rectIntersection
+    // 3. Fallback to all pointer collisions
     if (pointerCollisions.length > 0) return pointerCollisions;
     return rectIntersection(args);
   };
 
   return (
     <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`} >
-      {/* Invisible Droppable Edges */}
+      {/* Visible Droppable Edges */}
       <DroppableContainer id="edge-left" className="edge-drop-zone left" />
       <DroppableContainer id="edge-right" className="edge-drop-zone right" />
       
