@@ -49,7 +49,7 @@ function App() {
   const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null
   const [edgeTimer, setEdgeTimer] = useState(null);
   const EDGE_TIMEOUT = 1200; // ms, aumentato per evitare cambi accidentali
-  const EDGE_THRESHOLD = 50; // px dal bordo, aumentato per mobile
+  const EDGE_THRESHOLD = 80; // px dal bordo, aumentato ulteriormente per facilità d'uso su mobile
 
   const [addingToDay, setAddingToDay] = useState(null); // which day column is open for inline add
   const [inlineDayTask, setInlineDayTask] = useState(""); // text in the inline input
@@ -687,8 +687,12 @@ function App() {
         <div className="mobile-top-nav">
           <span className="mobile-title">Calendario 🗓️</span>
           <div className="mobile-nav-controls">
-            <button onClick={prevWeek}>←</button>
-            <button onClick={nextWeek}>→</button>
+            <DroppableContainer id="prev-week-btn" className="mobile-nav-btn-wrapper" onClick={prevWeek}>
+              <button style={{ pointerEvents: 'none' }}>←</button>
+            </DroppableContainer>
+            <DroppableContainer id="next-week-btn" className="mobile-nav-btn-wrapper" onClick={nextWeek}>
+              <button style={{ pointerEvents: 'none' }}>→</button>
+            </DroppableContainer>
             <button className="logout-btn" onClick={handleLogout} title="Logout">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

@@ -118,6 +118,30 @@
   padding: 20px;
 }
 
+.mobile-nav-btn-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-nav-btn-wrapper button {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.mobile-nav-btn-wrapper.droppable-active button {
+  background: #3b82f6 !important;
+  color: white !important;
+  transform: scale(1.2);
+}
+
 .main-layout {
   flex: 1;
   display: flex;
