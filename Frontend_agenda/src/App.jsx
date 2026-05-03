@@ -49,7 +49,7 @@ function App() {
   const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null
   const [edgeTimer, setEdgeTimer] = useState(null);
   const EDGE_TIMEOUT = 1200; // ms, aumentato per evitare cambi accidentali
-  const EDGE_THRESHOLD = 30; // px from screen edge
+  const EDGE_THRESHOLD = 50; // px dal bordo, aumentato per mobile
 
   const [addingToDay, setAddingToDay] = useState(null); // which day column is open for inline add
   const [inlineDayTask, setInlineDayTask] = useState(""); // text in the inline input
@@ -397,8 +397,15 @@ function App() {
   };
 
   const handleDragStart = (event) => {
-    // Store initial X coordinate using activatorEvent (more reliable)
-    dragStartX.current = event.activatorEvent?.clientX || 0;
+    // Correctly handle both Mouse/Pointer events and Touch events
+    const ae = event.activatorEvent;
+    let x = 0;
+    if (ae?.touches && ae.touches.length > 0) {
+      x = ae.touches[0].clientX;
+    } else if (ae?.clientX !== undefined) {
+      x = ae.clientX;
+    }
+    dragStartX.current = x;
     // Existing logic follows
     const { active } = event;
     let foundTask = null;
