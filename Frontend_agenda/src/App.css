@@ -33,9 +33,26 @@
   height: 20px;
 }
 
+/* STILE PER IL "FANTASMA" CHE TRASCINI */
+.dragging-task-mirror {
+  opacity: 0.5 !important; /* Molto trasparente */
+  transform: scale(1.05);  /* Leggermente più grande per enfasi */
+  pointer-events: none;
+  z-index: 99999 !important;
+}
+
+.dragging-task-mirror .task-item {
+  background: rgba(255, 255, 255, 0.8) !important;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.2) !important;
+  border: 2px solid #3b82f6 !important;
+  opacity: 1 !important; /* Qui lasciamo 1 perché la trasparenza è sul contenitore padre */
+}
+
 /* TRUCCO PER IL DRAG & DROP: rende invisibile l'originale mentre lo sposti */
 .task-item.is-dragging {
   opacity: 0 !important;
+  visibility: hidden !important; /* Aggiungo anche questo per sicurezza totale */
 }
 
 /* =========================
