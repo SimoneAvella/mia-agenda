@@ -33,6 +33,11 @@
   height: 20px;
 }
 
+/* TRUCCO PER IL DRAG & DROP: rende invisibile l'originale mentre lo sposti */
+.task-item.is-dragging {
+  opacity: 0 !important;
+}
+
 /* =========================
    APP CONTAINER
 ========================= */
