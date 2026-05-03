@@ -50,9 +50,11 @@
 }
 
 /* TRUCCO PER IL DRAG & DROP: rende invisibile l'originale mentre lo sposti */
-.task-item.is-dragging {
+.task-item.is-dragging, 
+[data-sortable-helper="true"].is-dragging {
   opacity: 0 !important;
-  visibility: hidden !important; /* Aggiungo anche questo per sicurezza totale */
+  visibility: hidden !important;
+  pointer-events: none !important;
 }
 
 /* =========================

@@ -697,13 +697,12 @@ function App() {
                       >
                         <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                           {tasks[day]?.map((t) => (
-                            <div key={t.id || t.task} onPointerDown={(e) => e.stopPropagation()}>
-                              <TaskItem
-                                task={t}
-                                toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
-                                editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
-                              />
-                            </div>
+                            <TaskItem
+                              key={t.id || t.task}
+                              task={t}
+                              toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
+                              editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
+                            />
                           ))}
                         </SortableContext>
 
