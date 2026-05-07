@@ -29,14 +29,17 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
   }, [isEditing]);
 
   const style = {
+    // Se il task è in fase di trascinamento (isDragging), lo rendiamo trasparente (opacity: 0)
+    // Questo perché dnd-kit mostra una "copia" (DragOverlay) e non vogliamo vedere l'originale sotto.
     opacity: isDragging ? 0 : 1, 
     visibility: isDragging ? "hidden" : "visible",
+    
     cursor: isEditing ? "text" : "grab",
     position: "relative",
     display: "flex",
     alignItems: "flex-start", 
     wordBreak: "break-word",
-    transform: CSS.Translate.toString(transform),
+    transform: CSS.Translate.toString(transform), // Gestisce il movimento fluido del task nella lista
     transition,
     zIndex: isDragging ? 9999 : "auto",
     pointerEvents: isDragging ? "none" : "auto"

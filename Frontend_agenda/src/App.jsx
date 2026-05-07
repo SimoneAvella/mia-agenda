@@ -46,12 +46,15 @@ function App() {
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [movingTaskId, setMovingTaskId] = useState(null);
   const [isDraggingFromBacklog, setIsDraggingFromBacklog] = useState(false);
-  const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null
+  const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null (indica se siamo sul bordo)
   const [edgeTimer, setEdgeTimer] = useState(null);
-  const EDGE_TIMEOUT = 1200; // ms, aumentato per evitare cambi accidentali
-  const EDGE_THRESHOLD = 80; // px dal bordo, aumentato ulteriormente per facilità d'uso su mobile
+  
+  // --- CONFIGURAZIONE NAVIGAZIONE AI BORDI ---
+  const EDGE_TIMEOUT = 1200; // Tempo (in ms) da aspettare sul bordo prima di girare pagina
+  const EDGE_THRESHOLD = 80; // Larghezza (in pixel) della zona sensibile ai bordi dello schermo
+  // --------------------------------------------
 
-  const [addingToDay, setAddingToDay] = useState(null); // which day column is open for inline add
+  const [addingToDay, setAddingToDay] = useState(null); // Giorno in cui stiamo aggiungendo un task inline
   const [inlineDayTask, setInlineDayTask] = useState(""); // text in the inline input
   const [newTaskTime, setNewTaskTime] = useState(""); // time for the new task being added
   const notifiedTasksRef = useRef(new Set()); // To avoid multiple notifications for same task
@@ -218,7 +221,7 @@ function App() {
       if (tasks[todayStr]) {
         tasks[todayStr].forEach(t => {
           if (!t.done && t.time === currentTime && !notifiedTasksRef.current.has(t.id)) {
-            new Notification("PROMEMORIA AGENTA 🚀", {
+            new Notification("PROMEMORIA AGENDA", {
               body: `È l'ora di: ${t.text || t.task}`,
               icon: "/favicon.ico",
               requireInteraction: true // La notifica resta finché non la chiudi
@@ -237,7 +240,7 @@ function App() {
     return (
       <div className="loading-screen">
         <div style={{ textAlign: 'center' }}>
-          <p>Svegliando l'agenda... ☕</p>
+          <p>Caricamento... ☕</p>
           <p style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>Il primo accesso può richiedere fino a 30 secondi.</p>
         </div>
       </div>
@@ -428,27 +431,35 @@ function App() {
     }
   };
 
+  /**
+   * Gestisce il movimento del task durante il trascinamento.
+   * Qui controlliamo se il task finisce sopra le frecce o vicino ai bordi dello schermo.
+   */
   const handleDragMove = (event) => {
     if (!ENABLE_WEEK_EDGE_DRAG) return;
 
     const { over } = event;
     let edge = null;
 
-    // Detect edge from droppable ID (more reliable than coordinates on mobile)
+    // 1. Rilevamento tramite ID (se siamo sopra le frecce della testata o le zone invisibili ai bordi)
     if (over?.id === 'prev-week-btn' || over?.id === 'edge-left') edge = 'left';
     else if (over?.id === 'next-week-btn' || over?.id === 'edge-right') edge = 'right';
     
+    // 2. Gestione del Timer: se entriamo in un bordo, facciamo partire il conto alla rovescia
     if (edge !== activeEdgeRef.current) {
+      // Se cambiamo bordo o usciamo, cancelliamo il timer precedente
       if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
+      
       activeEdgeRef.current = edge;
-      setDraggingEdge(edge);
+      setDraggingEdge(edge); // Aggiorna lo stato per mostrare l'indicatore blu visivo
       
       if (edge) {
+        // Se siamo su un bordo, avviamo il timer per cambiare settimana
         weekTimerRef.current = setTimeout(() => {
           if (activeEdgeRef.current === 'left') prevWeek();
           else if (activeEdgeRef.current === 'right') nextWeek();
           
-          // Reset after switch
+          // Reset dopo il cambio per evitare scatti multipli
           setDraggingEdge(null);
           activeEdgeRef.current = null;
         }, EDGE_TIMEOUT);
@@ -627,16 +638,21 @@ function App() {
     columns[colIdx].push(task);
   });
 
+  /**
+   * Motore di collisione personalizzato.
+   * Decide quale elemento ha la priorità quando trasciniamo un task sopra altri elementi.
+   */
   const customCollisionDetection = (args) => {
     const { active, droppableContainers } = args;
     if (!active) return [];
 
-    // 1. ALWAYS Prioritize "System" Targets (Trash, Archive, Arrows, Edges)
-    // Use BOTH pointer and rect intersection for maximum reliability on mobile
+    // Usiamo sia il puntatore che l'area del rettangolo per massima precisione su mobile
     const pointerCollisions = pointerWithin(args);
     const rectCollisions = rectIntersection(args);
     const allCollisions = [...pointerCollisions, ...rectCollisions];
 
+    // 1. PRIORITÀ ASSOLUTA: Cestino, Archivio, Frecce Navigazione e Bordi Schermo
+    // Se il task tocca una di queste zone, ignoriamo i giorni sottostanti.
     const systemCollision = allCollisions.find(c => 
       c.id === 'trash-zone' || c.id === 'archive-zone' || 
       c.id === 'prev-week-btn' || c.id === 'next-week-btn' ||
@@ -644,13 +660,13 @@ function App() {
     );
     if (systemCollision) return [systemCollision];
 
-    // 2. If dragging FROM backlog, prioritize Days
+    // 2. Se stiamo trascinando dal Backlog (attività laterali), diamo priorità ai Giorni
     if (isDraggingFromBacklog) {
       const dayCollision = allCollisions.find(c => days.includes(c.id));
       if (dayCollision) return [dayCollision];
     }
 
-    // 3. Fallback to all pointer collisions
+    // 3. Comportamento standard: restituisce le collisioni rilevate dal puntatore
     if (pointerCollisions.length > 0) return pointerCollisions;
     return rectIntersection(args);
   };
@@ -989,57 +1005,6 @@ function App() {
               onChange={(e) => setNewTask(e.target.value)}
               autoFocus
             />
-            <div className="time-picker-wrapper" style={{ marginTop: '15px' }}>
-              <label style={{ fontSize: '14px', fontWeight: 'bold', color: '#444', display: 'block', marginBottom: '8px' }}>Seleziona Orario ⏰</label>
-              <div className="time-wheel-container">
-                <div className="time-wheel-center-bar"></div>
-                
-                {/* ORE */}
-                <div 
-                  className="time-wheel-column"
-                  onScroll={(e) => {
-                    const idx = Math.round(e.target.scrollTop / 40);
-                    const h = String(idx).padStart(2, '0');
-                    const m = newTaskTime.split(':')[1] || "00";
-                    setNewTaskTime(`${h}:${m}`);
-                  }}
-                >
-                  <div style={{ height: '40px' }} /> {/* Spacer */}
-                  {Array.from({ length: 24 }).map((_, i) => (
-                    <div key={i} className={`time-wheel-item ${newTaskTime.startsWith(String(i).padStart(2, '0')) ? 'active' : ''}`}>
-                      {String(i).padStart(2, '0')}
-                    </div>
-                  ))}
-                  <div style={{ height: '40px' }} /> {/* Spacer */}
-                </div>
-
-                <div style={{ fontWeight: 'bold', fontSize: '1.5rem' }}>:</div>
-
-                {/* MINUTI */}
-                <div 
-                  className="time-wheel-column"
-                  onScroll={(e) => {
-                    const idx = Math.round(e.target.scrollTop / 40);
-                    const m = String(idx).padStart(2, '0');
-                    const h = newTaskTime.split(':')[0] || "00";
-                    setNewTaskTime(`${h}:${m}`);
-                  }}
-                >
-                  <div style={{ height: '40px' }} /> {/* Spacer */}
-                  {Array.from({ length: 60 }).map((_, i) => (
-                    <div key={i} className={`time-wheel-item ${newTaskTime.endsWith(String(i).padStart(2, '0')) ? 'active' : ''}`}>
-                      {String(i).padStart(2, '0')}
-                    </div>
-                  ))}
-                  <div style={{ height: '40px' }} /> {/* Spacer */}
-                </div>
-              </div>
-              {newTaskTime && (
-                <div style={{ textAlign: 'center', marginTop: '10px', color: '#ff4d4f', fontWeight: 'bold' }}>
-                  Scelto: {newTaskTime}
-                </div>
-              )}
-            </div>
             <div className="modal-actions">
               <button className="btn-cancel" onClick={() => { setIsQuickAddOpen(false); setNewTask(""); setNewTaskTime(""); }}>Annulla</button>
               <button className="btn-save" onClick={() => { handleAddTask(); setIsQuickAddOpen(false); }}>Salva</button>
