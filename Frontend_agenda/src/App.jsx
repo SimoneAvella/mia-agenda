@@ -516,17 +516,18 @@ function App() {
     const activeId = active.id;
 
     // Funzione di utilità per resettare lo stato alla fine di ogni operazione
-    const finishDrag = () => {
+    const finishDrag = (shouldCloseMenu = true) => {
       setActiveTask(null);
       setIsDraggingFromBacklog(false);
-      if (showArchiveModal) setShowArchiveModal(false);
       setDraggingEdge(null);
       activeEdgeRef.current = null;
+      // Chiudiamo il menu solo se richiesto (es. se abbiamo spostato il task in un giorno)
+      if (shouldCloseMenu && showArchiveModal) setShowArchiveModal(false);
     };
 
-    // Se non c'è una zona di atterraggio valida, annulliamo e ripristiniamo
+    // Se non c'è una zona di atterraggio valida, annulliamo ma teniamo il menu aperto
     if (!over) {
-      finishDrag();
+      finishDrag(false); 
       return;
     }
 
@@ -546,33 +547,38 @@ function App() {
         setTasks(newTasks);
         updateTasks(newTasks);
       }
-      finishDrag();
+      finishDrag(true); // Qui chiudiamo pure
       return;
     }
 
     // 3. Gestione Archivio (Backlog)
-    if (overId === "archive-zone") {
+    if (overId === "archive-zone" || overId === "Backlog" || String(overId).startsWith("Backlog-col-") || overId === "mobile-backlog") {
+      // Se viene dal backlog e lo rilasciamo nel backlog, gestiamo il riordinamento
       if (activeTask && activeTask.currentDay === "Backlog") {
-        finishDrag();
+        // Se è un rilascio generico nel menu, lo lasciamo lì senza chiudere
+        finishDrag(false); 
         return;
       }
+
+      // Se viene da un giorno e va in backlog
       const newTasks = { ...tasks };
       let foundT = null;
       Object.keys(newTasks).forEach(day => {
         const idx = newTasks[day].findIndex(t => String(t.id || t.task) === String(activeId));
         if (idx !== -1) foundT = newTasks[day].splice(idx, 1)[0];
       });
+
       if (foundT) {
         if (!newTasks["Backlog"]) newTasks["Backlog"] = [];
         newTasks["Backlog"].push({ ...foundT, done: false });
         setTasks(newTasks);
         updateTasks(newTasks);
       }
-      finishDrag();
+      finishDrag(false); // Teniamo aperto per far vedere che è arrivato
       return;
     }
 
-    // 4. Gestione Spostamento tra Giorni
+    // 4. Gestione Spostamento verso i Giorni
     let activeContainer = null;
     let activeIndex = -1;
     let foundTaskObj = null;
@@ -587,7 +593,7 @@ function App() {
     });
 
     if (!activeContainer || !foundTaskObj) {
-      finishDrag();
+      finishDrag(false);
       return;
     }
 
@@ -602,14 +608,15 @@ function App() {
       }
     });
 
-    if (String(overId).startsWith("Backlog-col-") || overId === "mobile-backlog") {
+    // Supporto per zone drop multi-colonna e mobile
+    if (String(overId).startsWith("Backlog-col-") || overId === "mobile-backlog" || overId === "Backlog") {
       overContainer = "Backlog";
-      overIndex = (tasks["Backlog"] || []).length;
+      if (overIndex === -1) overIndex = (tasks["Backlog"] || []).length;
     }
 
     const isValidDest = days.includes(overContainer) || overContainer === "Backlog";
     if (!isValidDest) {
-      finishDrag();
+      finishDrag(false);
       return;
     }
 
@@ -618,7 +625,7 @@ function App() {
       if (activeIndex !== overIndex && overIndex !== -1) {
         updatedTasks[activeContainer] = arrayMove(tasks[activeContainer], activeIndex, overIndex);
       } else {
-        finishDrag();
+        finishDrag(false);
         return;
       }
     } else {
@@ -637,7 +644,8 @@ function App() {
 
     setTasks(updatedTasks);
     updateTasks(updatedTasks);
-    finishDrag();
+    // Se lo spostiamo in un giorno, chiudiamo il menu. Se resta in backlog, lo teniamo aperto.
+    finishDrag(overContainer !== "Backlog");
   };
 
   const columns = [[], [], []];
