@@ -232,9 +232,24 @@ function App() {
       }
     };
 
-    const interval = setInterval(checkReminders, 30000); // Controlla ogni 30 secondi
+    const interval = setInterval(checkReminders, 30000); 
     return () => clearInterval(interval);
   }, [isAuthenticated, tasks]);
+
+  // --- RECUPERO UNA TANTUM (VERRÀ RIMOSSO SUBITO DOPO) ---
+  useEffect(() => {
+    if (Object.keys(tasks).length > 0 && tasks["Trash"] && tasks["Trash"].length > 0) {
+      const newTasks = { ...tasks };
+      if (!newTasks["Backlog"]) newTasks["Backlog"] = [];
+      newTasks["Backlog"] = [...newTasks["Backlog"], ...tasks["Trash"]];
+      delete newTasks["Trash"];
+      setTasks(newTasks);
+      updateTasks(newTasks);
+      alert("Task recuperati con successo! 📦 Saranno di nuovo nel Menu Azioni.");
+    }
+  }, [tasks]);
+  // ------------------------------------------------------
+
 
   if (isCheckingAuth) {
     return (
