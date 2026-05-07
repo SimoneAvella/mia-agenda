@@ -274,7 +274,7 @@ function App() {
   const toggleTaskDone = (day, taskId, taskText) => {
     const newTasks = { ...tasks };
     if (!newTasks[day]) return;
-    const idx = newTasks[day].findIndex(t => (t.id ? t.id === taskId : t.task === taskText));
+    const idx = newTasks[day].findIndex(t => (t.id ? t.id === taskId : (t.text === taskText || t.task === taskText)));
     if (idx === -1) return;
     
     newTasks[day] = [...newTasks[day]];
@@ -286,7 +286,7 @@ function App() {
   const deleteTask = (day, taskId, taskText) => {
     const newTasks = { ...tasks };
     if (!newTasks[day]) return;
-    const idx = newTasks[day].findIndex(t => (t.id ? t.id === taskId : t.task === taskText));
+    const idx = newTasks[day].findIndex(t => (t.id ? t.id === taskId : (t.text === taskText || t.task === taskText)));
     if (idx === -1) return;
     
     if (!newTasks["Trash"]) newTasks["Trash"] = [];
@@ -299,7 +299,7 @@ function App() {
   const editTaskText = (day, taskId, oldText, newText) => {
     const newTasks = { ...tasks };
     if (!newTasks[day]) return;
-    const idx = newTasks[day].findIndex(t => (t.id ? t.id === taskId : t.task === oldText));
+    const idx = newTasks[day].findIndex(t => (t.id ? t.id === taskId : (t.text === oldText || t.task === oldText)));
     if (idx === -1) return;
     
     newTasks[day] = [...newTasks[day]];
@@ -382,7 +382,7 @@ function App() {
     
     const newTaskObj = {
       id: `task-${day}-${Date.now()}`,
-      task: cleanedText,
+      text: cleanedText,
       done: false,
       time: timeToSet
     };
@@ -430,7 +430,7 @@ function App() {
     let foundDay = null;
     
     Object.keys(tasks).forEach(day => {
-      const t = tasks[day].find(item => String(item.id || item.task) === String(active.id));
+      const t = tasks[day].find(item => String(item.id || item.text || item.task) === String(active.id));
       if (t) {
         foundTask = t;
         foundDay = day;
@@ -586,7 +586,7 @@ function App() {
       if (foundT) {
         const backlogList = [...(updatedTasks["Backlog"] || [])];
         // Evitiamo duplicati se per caso il task era già lì
-        if (!backlogList.find(t => String(t.id || t.task) === String(activeId))) {
+        if (!backlogList.find(t => String(t.id || t.text || t.task) === String(activeId))) {
           backlogList.push({ ...foundT, done: false });
         }
         updatedTasks["Backlog"] = backlogList;
@@ -603,7 +603,7 @@ function App() {
     let foundTaskObj = null;
 
     Object.keys(tasks).forEach(key => {
-      const idx = (tasks[key] || []).findIndex(t => String(t.id || t.task) === String(activeId));
+      const idx = (tasks[key] || []).findIndex(t => String(t.id || t.text || t.task) === String(activeId));
       if (idx !== -1) {
         activeContainer = key;
         activeIndex = idx;
@@ -620,7 +620,7 @@ function App() {
     let overIndex = -1;
 
     Object.keys(tasks).forEach(key => {
-      const idx = (tasks[key] || []).findIndex(t => String(t.id || t.task) === String(overId));
+      const idx = (tasks[key] || []).findIndex(t => String(t.id || t.text || t.task) === String(overId));
       if (idx !== -1) {
         overContainer = key;
         overIndex = idx;
@@ -666,7 +666,7 @@ function App() {
     // RETE DI SICUREZZA: Verifichiamo che il task non sia andato perduto nel processo
     let taskExists = false;
     Object.keys(updatedTasks).forEach(k => {
-      if (updatedTasks[k].some(t => String(t.id || t.task) === String(activeId))) taskExists = true;
+      if (updatedTasks[k].some(t => String(t.id || t.text || t.task) === String(activeId))) taskExists = true;
     });
 
     // Se per qualche motivo il task è sparito, lo ripristiniamo nel contenitore originale
@@ -694,13 +694,25 @@ function App() {
     const { active, droppableContainers } = args;
     if (!active) return [];
 
-    // Usiamo sia il puntatore che l'area del rettangolo per massima precisione su mobile
+    // SE IL MENU ARCHIVIO È APERTO, PRIORITÀ ASSOLUTA AI BERSAGLI DEL MENU
+    // E IGNORIAMO I GIORNI SOTTOSTANTI
+    if (showArchiveModal) {
+      const modalTargets = droppableContainers.filter(c => 
+        c.id === 'Backlog' || c.id === 'trash-zone' || String(c.id).startsWith('Backlog-col-')
+      );
+      const modalCollisions = pointerWithin({ ...args, droppableContainers: modalTargets });
+      if (modalCollisions.length > 0) return modalCollisions;
+      
+      // Se il menu è aperto e non stiamo toccando un bersaglio del menu, 
+      // restituiamo vuoto per evitare collisioni accidentali con i giorni "sotto" il menu.
+      return [];
+    }
+
+    // 1. Prima controlliamo gli elementi di sistema (cestino, archivio, bordi frecce)
     const pointerCollisions = pointerWithin(args);
     const rectCollisions = rectIntersection(args);
     const allCollisions = [...pointerCollisions, ...rectCollisions];
 
-    // 1. PRIORITÀ ASSOLUTA: Cestino, Archivio, Frecce Navigazione e Bordi Schermo
-    // Se il task tocca una di queste zone, ignoriamo i giorni sottostanti.
     const systemCollision = allCollisions.find(c => 
       c.id === 'trash-zone' || c.id === 'archive-zone' || 
       c.id === 'prev-week-btn' || c.id === 'next-week-btn' ||
@@ -708,7 +720,7 @@ function App() {
     );
     if (systemCollision) return [systemCollision];
 
-    // 2. Se stiamo trascinando dal Backlog (attività laterali), diamo priorità ai Giorni
+    // 2. Se stiamo trascinando dal Backlog verso l'esterno, cerchiamo i Giorni
     if (isDraggingFromBacklog) {
       const dayCollision = allCollisions.find(c => days.includes(c.id));
       if (dayCollision) return [dayCollision];

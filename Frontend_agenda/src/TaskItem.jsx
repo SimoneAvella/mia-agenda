@@ -3,7 +3,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { useState, useEffect, useRef } from "react";
 
 export default function TaskItem({ task, toggleDone, editTaskText }) {
-  const draggableId = String(task.id ? task.id : task.task);
+  // Usiamo l'ID come identificatore unico per il drag, oppure il testo come fallback estremo
+  const draggableId = String(task.id || task.text || task.task);
   const { 
     attributes, 
     listeners, 
@@ -14,7 +15,7 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
   } = useSortable({ id: draggableId });
     
   const [isEditing, setIsEditing] = useState(false);
-  const displayText = task.text ? task.text : task.task;
+  const displayText = task.text || task.task || "";
   const [editText, setEditText] = useState(displayText);
   const inputRef = useRef(null);
 
