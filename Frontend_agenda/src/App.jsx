@@ -490,89 +490,91 @@ function App() {
   };
 
   const handleDragEnd = async (event) => {
-    // Cleanup any pending timers and reset edge state
+    // 1. Pulizia timer e bordi
     if (edgeTimer) clearTimeout(edgeTimer);
     setEdgeTimer(null);
-    setDraggingEdge(null);
     if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
     activeEdgeRef.current = null;
     dragStartX.current = null;
 
-    setActiveTask(null);
-    setIsDraggingFromBacklog(false);
-    if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
-    activeEdgeRef.current = null;
-    
-    // Auto-close archive when a drop happens (successful or not)
-    if (showArchiveModal) setShowArchiveModal(false);
-
     const { active, over } = event;
-    if (!over) return;
-
     const activeId = active.id;
+
+    // Funzione di utilità per resettare lo stato alla fine di ogni operazione
+    const finishDrag = () => {
+      setActiveTask(null);
+      setIsDraggingFromBacklog(false);
+      if (showArchiveModal) setShowArchiveModal(false);
+      setDraggingEdge(null);
+      activeEdgeRef.current = null;
+    };
+
+    // Se non c'è una zona di atterraggio valida, annulliamo e ripristiniamo
+    if (!over) {
+      finishDrag();
+      return;
+    }
+
     const overId = over.id;
 
-    // Handle Drop on Trash
+    // 2. Gestione Cestino
     if (overId === "trash-zone") {
       const newTasks = { ...tasks };
-      let foundTask = null;
-      let sourceDay = null;
-
+      let foundT = null;
       Object.keys(newTasks).forEach(day => {
         const idx = newTasks[day].findIndex(t => String(t.id || t.task) === String(activeId));
-        if (idx !== -1) {
-          foundTask = newTasks[day].splice(idx, 1)[0];
-          sourceDay = day;
-        }
+        if (idx !== -1) foundT = newTasks[day].splice(idx, 1)[0];
       });
-
-      if (foundTask) {
+      if (foundT) {
         if (!newTasks["Trash"]) newTasks["Trash"] = [];
-        newTasks["Trash"].push({ ...foundTask, done: false });
+        newTasks["Trash"].push({ ...foundT, done: false });
         setTasks(newTasks);
         updateTasks(newTasks);
       }
+      finishDrag();
       return;
     }
 
-    // Handle Drop on Archive (Backlog)
+    // 3. Gestione Archivio (Backlog)
     if (overId === "archive-zone") {
+      if (activeTask && activeTask.currentDay === "Backlog") {
+        finishDrag();
+        return;
+      }
       const newTasks = { ...tasks };
-      let foundTask = null;
-      let sourceDay = null;
-
+      let foundT = null;
       Object.keys(newTasks).forEach(day => {
         const idx = newTasks[day].findIndex(t => String(t.id || t.task) === String(activeId));
-        if (idx !== -1) {
-          foundTask = newTasks[day].splice(idx, 1)[0];
-          sourceDay = day;
-        }
+        if (idx !== -1) foundT = newTasks[day].splice(idx, 1)[0];
       });
-
-      if (foundTask && sourceDay !== "Backlog") {
+      if (foundT) {
         if (!newTasks["Backlog"]) newTasks["Backlog"] = [];
-        newTasks["Backlog"].push({ ...foundTask, done: false });
+        newTasks["Backlog"].push({ ...foundT, done: false });
         setTasks(newTasks);
         updateTasks(newTasks);
       }
+      finishDrag();
       return;
     }
 
+    // 4. Gestione Spostamento tra Giorni
     let activeContainer = null;
     let activeIndex = -1;
-    let foundTask = null;
+    let foundTaskObj = null;
 
     Object.keys(tasks).forEach(key => {
       const idx = (tasks[key] || []).findIndex(t => String(t.id || t.task) === String(activeId));
       if (idx !== -1) {
         activeContainer = key;
         activeIndex = idx;
-        foundTask = tasks[key][idx];
+        foundTaskObj = tasks[key][idx];
       }
     });
 
-    if (!activeContainer || !foundTask) return;
-
+    if (!activeContainer || !foundTaskObj) {
+      finishDrag();
+      return;
+    }
 
     let overContainer = overId;
     let overIndex = -1;
@@ -585,22 +587,23 @@ function App() {
       }
     });
 
-    if (String(overId).startsWith("Backlog-col-")) {
-      overContainer = "Backlog";
-      overIndex = (tasks["Backlog"] || []).length;
-    } else if (overId === "mobile-backlog") {
+    if (String(overId).startsWith("Backlog-col-") || overId === "mobile-backlog") {
       overContainer = "Backlog";
       overIndex = (tasks["Backlog"] || []).length;
     }
 
     const isValidDest = days.includes(overContainer) || overContainer === "Backlog";
-    if (!isValidDest) return;
+    if (!isValidDest) {
+      finishDrag();
+      return;
+    }
 
     const updatedTasks = { ...tasks };
     if (activeContainer === overContainer) {
       if (activeIndex !== overIndex && overIndex !== -1) {
         updatedTasks[activeContainer] = arrayMove(tasks[activeContainer], activeIndex, overIndex);
       } else {
+        finishDrag();
         return;
       }
     } else {
@@ -609,7 +612,7 @@ function App() {
       updatedTasks[activeContainer] = sourceList;
 
       const destList = [...(updatedTasks[overContainer] || [])];
-      const newTaskObj = { ...foundTask };
+      const newTaskObj = { ...foundTaskObj };
       
       if (overIndex === -1) destList.push(newTaskObj);
       else destList.splice(overIndex, 0, newTaskObj);
@@ -619,17 +622,7 @@ function App() {
 
     setTasks(updatedTasks);
     updateTasks(updatedTasks);
-    
-    // Cleanup edge tracking
-    setDraggingEdge(null);
-    activeEdgeRef.current = null;
-    if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
-
-    try {
-      await updateTasks(updatedTasks);
-    } catch (e) {
-      console.error("Failed to save tasks:", e);
-    }
+    finishDrag();
   };
 
   const columns = [[], [], []];
