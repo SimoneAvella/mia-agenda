@@ -585,7 +585,10 @@ function App() {
 
       if (foundT) {
         const backlogList = [...(updatedTasks["Backlog"] || [])];
-        backlogList.push({ ...foundT, done: false });
+        // Evitiamo duplicati se per caso il task era già lì
+        if (!backlogList.find(t => String(t.id || t.task) === String(activeId))) {
+          backlogList.push({ ...foundT, done: false });
+        }
         updatedTasks["Backlog"] = backlogList;
         setTasks(updatedTasks);
         updateTasks(updatedTasks);
@@ -658,6 +661,18 @@ function App() {
       else destList.splice(overIndex, 0, newTaskObj);
       
       updatedTasks[overContainer] = destList;
+    }
+
+    // RETE DI SICUREZZA: Verifichiamo che il task non sia andato perduto nel processo
+    let taskExists = false;
+    Object.keys(updatedTasks).forEach(k => {
+      if (updatedTasks[k].some(t => String(t.id || t.task) === String(activeId))) taskExists = true;
+    });
+
+    // Se per qualche motivo il task è sparito, lo ripristiniamo nel contenitore originale
+    if (!taskExists && foundTaskObj) {
+      console.warn("Rete di sicurezza: task ripristinato.");
+      updatedTasks[activeContainer] = [...(updatedTasks[activeContainer] || []), foundTaskObj];
     }
 
     setTasks(updatedTasks);
@@ -990,7 +1005,10 @@ function App() {
         )}
 
         {showArchiveModal && (
-          <div className={activeTask ? "archive-modal-overlay is-dragging" : "archive-modal-overlay"} onClick={() => setShowArchiveModal(false)}>
+          <div 
+            className={activeTask ? "archive-modal-overlay is-dragging" : "archive-modal-overlay"} 
+            onClick={() => { if (!activeTask) setShowArchiveModal(false); }}
+          >
             <div className="archive-modal-content" onClick={(e) => e.stopPropagation()}>
               <div className="archive-modal-header">
                 <h2>Archivio 📋</h2>
