@@ -504,6 +504,7 @@ function App() {
     touchStartY.current = null;
   };
 
+
   const handleDragEnd = async (event) => {
     // 1. Pulizia timer e bordi
     if (edgeTimer) clearTimeout(edgeTimer);
@@ -515,17 +516,16 @@ function App() {
     const { active, over } = event;
     const activeId = active.id;
 
-    // Funzione di utilità per resettare lo stato alla fine di ogni operazione
     const finishDrag = (shouldCloseMenu = true) => {
       setActiveTask(null);
       setIsDraggingFromBacklog(false);
       setDraggingEdge(null);
       activeEdgeRef.current = null;
-      // Chiudiamo il menu solo se richiesto (es. se abbiamo spostato il task in un giorno)
       if (shouldCloseMenu && showArchiveModal) setShowArchiveModal(false);
     };
 
-    // Se non c'è una zona di atterraggio valida, annulliamo ma teniamo il menu aperto
+    // Se non c'è una zona di atterraggio (over è null), non facciamo NULLA.
+    // Il task resta dove era nello stato originale.
     if (!over) {
       finishDrag(false); 
       return;
@@ -535,50 +535,66 @@ function App() {
 
     // 2. Gestione Cestino
     if (overId === "trash-zone") {
-      const newTasks = { ...tasks };
+      const updatedTasks = { ...tasks };
       let foundT = null;
-      Object.keys(newTasks).forEach(day => {
-        const idx = newTasks[day].findIndex(t => String(t.id || t.task) === String(activeId));
-        if (idx !== -1) foundT = newTasks[day].splice(idx, 1)[0];
-      });
-      if (foundT) {
-        if (!newTasks["Trash"]) newTasks["Trash"] = [];
-        newTasks["Trash"].push({ ...foundT, done: false });
-        setTasks(newTasks);
-        updateTasks(newTasks);
+      let sourceKey = null;
+
+      // Cerchiamo il task senza modificare gli array originali ancora
+      for (const key of Object.keys(updatedTasks)) {
+        const idx = (updatedTasks[key] || []).findIndex(t => String(t.id || t.task) === String(activeId));
+        if (idx !== -1) {
+          sourceKey = key;
+          // Creiamo una COPIA dell'array prima di modificarlo
+          const newList = [...updatedTasks[key]];
+          foundT = newList.splice(idx, 1)[0];
+          updatedTasks[key] = newList;
+          break;
+        }
       }
-      finishDrag(true); // Qui chiudiamo pure
+
+      if (foundT) {
+        const trashList = [...(updatedTasks["Trash"] || [])];
+        trashList.push({ ...foundT, done: false });
+        updatedTasks["Trash"] = trashList;
+        setTasks(updatedTasks);
+        updateTasks(updatedTasks);
+      }
+      finishDrag(true);
       return;
     }
 
     // 3. Gestione Archivio (Backlog)
     if (overId === "archive-zone" || overId === "Backlog" || String(overId).startsWith("Backlog-col-") || overId === "mobile-backlog") {
-      // Se viene dal backlog e lo rilasciamo nel backlog, gestiamo il riordinamento
+      // Se il task viene già dal Backlog, non facciamo nulla (resta lì)
       if (activeTask && activeTask.currentDay === "Backlog") {
-        // Se è un rilascio generico nel menu, lo lasciamo lì senza chiudere
         finishDrag(false); 
         return;
       }
 
-      // Se viene da un giorno e va in backlog
-      const newTasks = { ...tasks };
+      const updatedTasks = { ...tasks };
       let foundT = null;
-      Object.keys(newTasks).forEach(day => {
-        const idx = newTasks[day].findIndex(t => String(t.id || t.task) === String(activeId));
-        if (idx !== -1) foundT = newTasks[day].splice(idx, 1)[0];
-      });
+      for (const key of Object.keys(updatedTasks)) {
+        const idx = (updatedTasks[key] || []).findIndex(t => String(t.id || t.task) === String(activeId));
+        if (idx !== -1) {
+          const newList = [...updatedTasks[key]];
+          foundT = newList.splice(idx, 1)[0];
+          updatedTasks[key] = newList;
+          break;
+        }
+      }
 
       if (foundT) {
-        if (!newTasks["Backlog"]) newTasks["Backlog"] = [];
-        newTasks["Backlog"].push({ ...foundT, done: false });
-        setTasks(newTasks);
-        updateTasks(newTasks);
+        const backlogList = [...(updatedTasks["Backlog"] || [])];
+        backlogList.push({ ...foundT, done: false });
+        updatedTasks["Backlog"] = backlogList;
+        setTasks(updatedTasks);
+        updateTasks(updatedTasks);
       }
-      finishDrag(false); // Teniamo aperto per far vedere che è arrivato
+      finishDrag(false);
       return;
     }
 
-    // 4. Gestione Spostamento verso i Giorni
+    // 4. Gestione Spostamento verso i Giorni (o riordinamento interno)
     let activeContainer = null;
     let activeIndex = -1;
     let foundTaskObj = null;
@@ -614,6 +630,7 @@ function App() {
       if (overIndex === -1) overIndex = (tasks["Backlog"] || []).length;
     }
 
+    // SE LA DESTINAZIONE NON È UN GIORNO E NON È IL BACKLOG, ANNULLA
     const isValidDest = days.includes(overContainer) || overContainer === "Backlog";
     if (!isValidDest) {
       finishDrag(false);
@@ -629,6 +646,7 @@ function App() {
         return;
       }
     } else {
+      // SPOSTAMENTO TRA CONTENITORI DIVERSI
       const sourceList = [...(updatedTasks[activeContainer] || [])];
       sourceList.splice(activeIndex, 1);
       updatedTasks[activeContainer] = sourceList;
@@ -644,7 +662,6 @@ function App() {
 
     setTasks(updatedTasks);
     updateTasks(updatedTasks);
-    // Se lo spostiamo in un giorno, chiudiamo il menu. Se resta in backlog, lo teniamo aperto.
     finishDrag(overContainer !== "Backlog");
   };
 
