@@ -29,25 +29,24 @@ import DroppableContainer from "./DroppableContainer";
 import Login from "./Login";
 
 function App() {
-  // Ref to store the X coordinate where the drag started (for desktop testing)
-  const dragStartX = useRef(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isCheckingAuth, setIsCheckingAuth] = useState(true);
-  const [weekStart, setWeekStart] = useState(new Date());
-  const [days, setDays] = useState([]);
-  const [tasks, setTasks] = useState({ Backlog: [] });
-  const [showInput, setShowInput] = useState(false);
+  // --- STATI PRINCIPALI DELL'APPLICAZIONE ---
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // Utente loggato?
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true);   // Caricamento iniziale login
+  const [weekStart, setWeekStart] = useState(new Date());       // Il Lunedì della settimana visualizzata
+  const [days, setDays] = useState([]);                         // Array dei 7 giorni correnti (es. "2023-10-25")
+  const [tasks, setTasks] = useState({ Backlog: [] });          // IL DATABASE LOCALE: contiene tutti i task divisi per giorno
+  const [showInput, setShowInput] = useState(false);            // Mostra/nasconde il campo "Aggiungi veloce"
   const [isMobile, setIsMobile] = useState(('ontouchstart' in window) || window.innerWidth <= 768);
 
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [newTask, setNewTask] = useState("");
-  const [showTrashModal, setShowTrashModal] = useState(false);
-  const [activeTask, setActiveTask] = useState(null);
-  const [showArchiveModal, setShowArchiveModal] = useState(false);
-  const [movingTaskId, setMovingTaskId] = useState(null);
-  const [isDraggingFromBacklog, setIsDraggingFromBacklog] = useState(false);
-  const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null (indica se siamo sul bordo)
-  const [edgeTimer, setEdgeTimer] = useState(null);
+  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);  // Popup aggiunta rapida
+  const [newTask, setNewTask] = useState("");                   // Testo del nuovo task che stai scrivendo
+  const [showTrashModal, setShowTrashModal] = useState(false);  // Visibilità del Cestino
+  const [activeTask, setActiveTask] = useState(null);           // Il task che stai TRASCINANDO in questo momento
+  const [showArchiveModal, setShowArchiveModal] = useState(false); // Visibilità Menu Azioni (Backlog)
+  const [movingTaskId, setMovingTaskId] = useState(null);       // Per spostamenti rapidi senza drag
+  const [isDraggingFromBacklog, setIsDraggingFromBacklog] = useState(false); // Indica se il drag è partito dal menu
+  const [draggingEdge, setDraggingEdge] = useState(null);       // Indica se il task è vicino ai bordi dello schermo (per cambiare settimana)
+  const [edgeTimer, setEdgeTimer] = useState(null);             // Timer per il cambio settimana automatico durante il drag
   
   // --- MONITOR DI DEBUG (TEMPORANEO) ---
   const [debugLogs, setDebugLogs] = useState([]);
@@ -58,9 +57,8 @@ function App() {
   // --------------------------------------
   
   // --- CONFIGURAZIONE NAVIGAZIONE AI BORDI ---
-  // Queste costanti decidono quanto è sensibile il bordo dello schermo per cambiare settimana durante il drag.
-  const EDGE_TIMEOUT = 1200; // Millisecondi da aspettare sul bordo prima di girare pagina
-  const EDGE_THRESHOLD = 80; // Larghezza in pixel della zona sensibile ai lati dello schermo
+  const EDGE_TIMEOUT = 1200; // Tempo (in ms) da aspettare sul bordo prima di girare pagina
+  const EDGE_THRESHOLD = 80; // Larghezza (in pixel) della zona sensibile ai bordi dello schermo
   // --------------------------------------------
 
   const [addingToDay, setAddingToDay] = useState(null); // Giorno in cui stiamo aggiungendo un task inline
@@ -147,17 +145,15 @@ function App() {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
-  // --- CONFIGURAZIONE SENSORI DRAG & DROP ---
-  // Decidono come l'app reagisce al tocco o al mouse.
+  // --- CONFIGURAZIONE SENSORI (Il cuore del trascinamento) ---
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      // Su PC, il drag inizia solo dopo aver mosso il mouse di 8 pixel (evita click accidentali)
-      activationConstraint: { distance: 8 },
+      activationConstraint: { distance: 8 }, // Muovi di 8px prima di iniziare il drag (evita drag accidentali al click)
     }),
     useSensor(TouchSensor, {
-      // Su MOBILE, il drag inizia solo dopo aver tenuto premuto per 200ms.
-      // Questo permette di scorrere la pagina normalmente senza "prendere" i task per sbaglio.
-      activationConstraint: { delay: 200, tolerance: 10 },
+      // IMPORTANTE PER MOBILE: Aspetta 200ms prima di iniziare il drag.
+      // Questo permette di scorrere la pagina (scroll) senza "prendere" i task per sbaglio.
+      activationConstraint: { delay: 200, tolerance: 10 }, 
     })
   );
 
@@ -428,10 +424,6 @@ function App() {
     });
   };
 
-  /**
-   * handleDragStart: Viene chiamata non appena inizi a trascinare un task.
-   * Qui "prendiamo" il task e lo mettiamo in uno stato temporaneo (activeTask).
-   */
   const handleDragStart = (event) => {
     // Correctly handle both Mouse/Pointer events and Touch events
     const ae = event.activatorEvent;
@@ -527,11 +519,11 @@ function App() {
 
 
   /**
-   * handleDragEnd: La funzione più importante. Viene chiamata quando rilascio il task.
-   * Decide se lo spostamento è valido e aggiorna il database.
+   * FUNZIONE: handleDragEnd
+   * Viene eseguita quando RILASCI un task. È qui che avviene lo spostamento effettivo.
    */
   const handleDragEnd = async (event) => {
-    // 1. Pulizia timer e bordi
+    // 1. Pulizia timer e bordi (per fermare eventuali cambi settimana automatici)
     if (edgeTimer) clearTimeout(edgeTimer);
     setEdgeTimer(null);
     if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
@@ -541,6 +533,7 @@ function App() {
     const { active, over } = event;
     const activeId = active.id;
 
+    // Funzione interna per resettare lo stato e chiudere o meno il menu
     const finishDrag = (shouldCloseMenu = true) => {
       setActiveTask(null);
       setIsDraggingFromBacklog(false);
@@ -549,27 +542,25 @@ function App() {
       if (shouldCloseMenu && showArchiveModal) setShowArchiveModal(false);
     };
 
-    // Se non c'è una zona di atterraggio (over è null), non facciamo NULLA.
-    // Il task resta dove era nello stato originale.
+    // Se rilasciamo nel vuoto (non sopra un giorno o cestino), annulliamo
     if (!over) {
+      addDebugLog("Rilascio annullato (fuori zona)");
       finishDrag(false); 
       return;
     }
 
     const overId = over.id;
 
-    // 2. Gestione Cestino
+    // --- CASO: SPOSTAMENTO NEL CESTINO ---
     if (overId === "trash-zone") {
       const updatedTasks = { ...tasks };
       let foundT = null;
       let sourceKey = null;
 
-      // Cerchiamo il task senza modificare gli array originali ancora
       for (const key of Object.keys(updatedTasks)) {
-        const idx = (updatedTasks[key] || []).findIndex(t => String(t.id || t.task) === String(activeId));
+        const idx = (updatedTasks[key] || []).findIndex(t => String(t.id || t.text || t.task) === String(activeId));
         if (idx !== -1) {
           sourceKey = key;
-          // Creiamo una COPIA dell'array prima di modificarlo
           const newList = [...updatedTasks[key]];
           foundT = newList.splice(idx, 1)[0];
           updatedTasks[key] = newList;
@@ -588,9 +579,9 @@ function App() {
       return;
     }
 
-    // 3. Gestione Archivio (Backlog)
+    // --- CASO: SPOSTAMENTO NEL MENU AZIONI (BACKLOG) ---
     if (overId === "archive-zone" || overId === "Backlog" || String(overId).startsWith("Backlog-col-") || overId === "mobile-backlog") {
-      // Se il task viene già dal Backlog, non facciamo nulla (resta lì)
+      // Se il task viene già dal Backlog, non facciamo nulla (rimane dov'è)
       if (activeTask && activeTask.currentDay === "Backlog") {
         finishDrag(false); 
         return;
@@ -599,7 +590,7 @@ function App() {
       const updatedTasks = { ...tasks };
       let foundT = null;
       for (const key of Object.keys(updatedTasks)) {
-        const idx = (updatedTasks[key] || []).findIndex(t => String(t.id || t.task) === String(activeId));
+        const idx = (updatedTasks[key] || []).findIndex(t => String(t.id || t.text || t.task) === String(activeId));
         if (idx !== -1) {
           const newList = [...updatedTasks[key]];
           foundT = newList.splice(idx, 1)[0];
@@ -610,7 +601,7 @@ function App() {
 
       if (foundT) {
         const backlogList = [...(updatedTasks["Backlog"] || [])];
-        // Evitiamo duplicati se per caso il task era già lì
+        // Evitiamo duplicati
         if (!backlogList.find(t => String(t.id || t.text || t.task) === String(activeId))) {
           backlogList.push({ ...foundT, done: false });
         }
@@ -618,15 +609,16 @@ function App() {
         setTasks(updatedTasks);
         updateTasks(updatedTasks);
       }
-      finishDrag(false);
+      finishDrag(false); // Teniamo il menu aperto per feedback visivo
       return;
     }
 
-    // 4. Gestione Spostamento verso i Giorni (o riordinamento interno)
+    // --- CASO: SPOSTAMENTO TRA I GIORNI DELLA SETTIMANA ---
     let activeContainer = null;
     let activeIndex = -1;
     let foundTaskObj = null;
 
+    // Cerchiamo dove si trova il task attualmente
     Object.keys(tasks).forEach(key => {
       const idx = (tasks[key] || []).findIndex(t => String(t.id || t.text || t.task) === String(activeId));
       if (idx !== -1) {
@@ -644,6 +636,7 @@ function App() {
     let overContainer = overId;
     let overIndex = -1;
 
+    // Capiamo su quale giorno/task stiamo rilasciando
     Object.keys(tasks).forEach(key => {
       const idx = (tasks[key] || []).findIndex(t => String(t.id || t.text || t.task) === String(overId));
       if (idx !== -1) {
@@ -652,13 +645,13 @@ function App() {
       }
     });
 
-    // Supporto per zone drop multi-colonna e mobile
+    // Se rilasciamo sulle colonne del backlog mentre il menu è aperto
     if (String(overId).startsWith("Backlog-col-") || overId === "mobile-backlog" || overId === "Backlog") {
       overContainer = "Backlog";
       if (overIndex === -1) overIndex = (tasks["Backlog"] || []).length;
     }
 
-    // SE LA DESTINAZIONE NON È UN GIORNO E NON È IL BACKLOG, ANNULLA
+    // Se la destinazione non è un giorno valido o il backlog, annulliamo
     const isValidDest = days.includes(overContainer) || overContainer === "Backlog";
     if (!isValidDest) {
       finishDrag(false);
@@ -667,6 +660,7 @@ function App() {
 
     const updatedTasks = { ...tasks };
     if (activeContainer === overContainer) {
+      // RIORDINAMENTO INTERNO ALLO STESSO GIORNO
       if (activeIndex !== overIndex && overIndex !== -1) {
         updatedTasks[activeContainer] = arrayMove(tasks[activeContainer], activeIndex, overIndex);
       } else {
@@ -674,7 +668,7 @@ function App() {
         return;
       }
     } else {
-      // SPOSTAMENTO TRA CONTENITORI DIVERSI
+      // SPOSTAMENTO REALE TRA GIORNI DIVERSI
       const sourceList = [...(updatedTasks[activeContainer] || [])];
       sourceList.splice(activeIndex, 1);
       updatedTasks[activeContainer] = sourceList;
@@ -682,30 +676,33 @@ function App() {
       const destList = [...(updatedTasks[overContainer] || [])];
       const newTaskObj = { ...foundTaskObj };
       
-      if (overIndex === -1) destList.push(newTaskObj);
-      else destList.splice(overIndex, 0, newTaskObj);
+      if (overIndex === -1) destList.push(newTaskObj); // In fondo alla lista
+      else destList.splice(overIndex, 0, newTaskObj); // In una posizione specifica
       
       updatedTasks[overContainer] = destList;
     }
 
-    // RETE DI SICUREZZA: Verifichiamo che il task non sia andato perduto nel processo
+    // --- RETE DI SICUREZZA ---
+    // Controlliamo che il task non sia "sparito" per errore logico
     let taskExists = false;
     Object.keys(updatedTasks).forEach(k => {
       if (updatedTasks[k].some(t => String(t.id || t.text || t.task) === String(activeId))) taskExists = true;
     });
 
-    // Se per qualche motivo il task è sparito, lo ripristiniamo nel contenitore originale
     if (!taskExists && foundTaskObj) {
-      addDebugLog("SAFETY: Task ripristinato!");
+      addDebugLog("SAFETY: Task recuperato automaticamente!");
       updatedTasks[activeContainer] = [...(updatedTasks[activeContainer] || []), foundTaskObj];
     }
 
     setTasks(updatedTasks);
-    updateTasks(updatedTasks);
+    updateTasks(updatedTasks); // Salvataggio sul server
     addDebugLog(`END: Spostato in ${overContainer}`);
     finishDrag(overContainer !== "Backlog");
   };
 
+  /**
+   * Suddivide i task del backlog in 3 colonne per la visualizzazione.
+   */
   const columns = [[], [], []];
   tasks["Backlog"]?.forEach((task, index) => {
     const colIdx = index % 3;
@@ -713,19 +710,16 @@ function App() {
   });
 
   /**
-   * Motore di collisione personalizzato.
-   * Decide quale elemento ha la priorità quando trasciniamo un task sopra altri elementi.
-   */
-  /**
-   * customCollisionDetection: Il "cervello" che capisce cosa c'è sotto il tuo dito.
-   * Determina la priorità tra menu, giorni e cestino.
+   * MOTORE DI COLLISIONE PERSONALIZZATO
+   * È il "cervello" che decide quale elemento viene colpito durante il trascinamento.
    */
   const customCollisionDetection = (args) => {
     const { active, droppableContainers } = args;
     if (!active) return [];
 
-    // SE IL MENU ARCHIVIO È APERTO, PRIORITÀ ASSOLUTA AI BERSAGLI DEL MENU
-    // E IGNORIAMO I GIORNI SOTTOSTANTI
+    // --- LO SCUDO DEL MENU ---
+    // Se il Menu Azioni è aperto, forziamo il sistema a vedere SOLO il menu
+    // Questo evita che il task venga rilasciato per errore su un giorno che sta "sotto"
     if (showArchiveModal) {
       const modalTargets = droppableContainers.filter(c => 
         c.id === 'Backlog' || c.id === 'trash-zone' || String(c.id).startsWith('Backlog-col-')
@@ -733,12 +727,10 @@ function App() {
       const modalCollisions = pointerWithin({ ...args, droppableContainers: modalTargets });
       if (modalCollisions.length > 0) return modalCollisions;
       
-      // Se il menu è aperto e non stiamo toccando un bersaglio del menu, 
-      // restituiamo vuoto per evitare collisioni accidentali con i giorni "sotto" il menu.
-      return [];
+      return []; // Se non tocca nulla nel menu, non toccare nulla fuori
     }
 
-    // 1. Prima controlliamo gli elementi di sistema (cestino, archivio, bordi frecce)
+    // 1. Rilevamento elementi di sistema (Cestino, Pulsanti Navigazione, Bordi Schermo)
     const pointerCollisions = pointerWithin(args);
     const rectCollisions = rectIntersection(args);
     const allCollisions = [...pointerCollisions, ...rectCollisions];
@@ -750,7 +742,7 @@ function App() {
     );
     if (systemCollision) return [systemCollision];
 
-    // 2. Se stiamo trascinando dal Backlog verso l'esterno, cerchiamo i Giorni
+    // 2. Se trasciniamo dal Backlog verso l'esterno, cerchiamo i Giorni della settimana
     if (isDraggingFromBacklog) {
       const dayCollision = allCollisions.find(c => days.includes(c.id));
       if (dayCollision) return [dayCollision];
@@ -1046,116 +1038,204 @@ function App() {
           </div>
         )}
 
-        {showArchiveModal && (
-          <div 
-            className={activeTask ? "archive-modal-overlay is-dragging" : "archive-modal-overlay"} 
-            onClick={() => { if (!activeTask) setShowArchiveModal(false); }}
-          >
-            <div className="archive-modal-content" onClick={(e) => e.stopPropagation()}>
-              <div className="archive-modal-header">
-                <h2>Archivio 📋</h2>
-                <div className="archive-header-actions">
-                  <button className="archive-header-add-btn" onClick={() => setIsQuickAddOpen(true)}>➕</button>
-                  <button className="close-modal-btn" onClick={() => setShowArchiveModal(false)}>✖</button>
+        {/* --- RENDERING DELL'INTERFACCIA --- */}
+        <DndContext
+          sensors={sensors}
+          /* Motore di collisione personalizzato per gestire il posizionamento degli elementi trascinati */
+          collisionDetection={customCollisionDetection}
+          onDragStart={handleDragStart}
+          onDragMove={handleDragMove}
+          onDragEnd={handleDragEnd}
+          /* Strategia di misura per aggiornare costantemente i confini delle drop zone */
+          measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+        >
+          <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'}`}>
+            
+            {/* TESTATA: Titolo, data corrente e pulsanti navigazione */}
+            <header className="main-header">
+              <div className="header-top">
+                <div className="logo-section">
+                  <h1 className="app-title">Agenda</h1>
+                  <span className="current-date-badge">
+                    {new Date().toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}
+                  </span>
+                </div>
+                
+                <div className="week-navigation">
+                  <DroppableContainer id="prev-week-btn" className="nav-btn-wrapper">
+                    <button className="nav-btn" onClick={prevWeek}>◀</button>
+                  </DroppableContainer>
+                  
+                  <h2 className="week-label">
+                    Settimana del {weekStart.toLocaleDateString('it-IT', { day: 'numeric', month: 'short' })}
+                  </h2>
+                  
+                  <DroppableContainer id="next-week-btn" className="nav-btn-wrapper">
+                    <button className="nav-btn" onClick={nextWeek}>▶</button>
+                  </DroppableContainer>
                 </div>
               </div>
-              
-              <div className="archive-items-list">
-                {(!tasks["Backlog"] || tasks["Backlog"].length === 0) ? (
-                  <p style={{ textAlign: "center", color: "#888", padding: "20px" }}>Nessuna attività in archivio.</p>
-                ) : (
-                  <DroppableContainer 
-                    id="Backlog" 
-                    className="archive-droppable-list"
-                  >
-                    <SortableContext items={tasks["Backlog"] || []} strategy={rectSortingStrategy}>
-                      {tasks["Backlog"].map((t) => (
+            </header>
+
+            {/* CONTENUTO PRINCIPALE: La griglia dei giorni */}
+            <main className="agenda-grid">
+              {days.map((day) => (
+                <DroppableContainer key={day} id={day} className="day-column">
+                  <div className="day-header">
+                    <h3>{new Date(day).toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric' })}</h3>
+                    <button className="add-task-inline-btn" onClick={() => setAddingToDay(day)}>＋</button>
+                  </div>
+                  
+                  {/* Lista dei task del giorno */}
+                  <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
+                    <div className="task-list">
+                      {(tasks[day] || []).map((t) => (
                         <TaskItem
-                          key={t.id || t.task}
+                          key={t.id || t.text || t.task}
                           task={t}
-                          toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)}
-                          editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)}
+                          toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)}
+                          editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)}
                         />
                       ))}
+                    </div>
+                  </SortableContext>
+
+                  {/* Input rapido che appare in fondo alla colonna */}
+                  {addingToDay === day && (
+                    <div className="inline-add-container">
+                      <textarea
+                        autoFocus
+                        placeholder="Nuova attività..."
+                        value={inlineDayTask}
+                        onChange={(e) => setInlineDayTask(e.target.value)}
+                        onBlur={() => handleAddTaskToDay(day)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            handleAddTaskToDay(day);
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </DroppableContainer>
+              ))}
+            </main>
+
+            {/* BARRA DI NAVIGAZIONE MOBILE (In fondo allo schermo) */}
+            <nav className="mobile-bottom-nav">
+              <DroppableContainer id="trash-zone" className="mobile-nav-btn-wrapper">
+                <button className="mobile-nav-btn trash" onClick={() => setShowTrashModal(true)}>🗑️</button>
+<button className="mobile-nav-btn add-main" onClick={() => setIsQuickAddOpen(true)}>＋</button>
+              
+              <DroppableContainer id="archive-zone" className="mobile-nav-btn-wrapper">
+                <button className="mobile-nav-btn archive" onClick={() => setShowArchiveModal(true)}>📋</button>
+              </DroppableContainer>
+            </nav>
+
+            {/* MODALE CESTINO */}
+            {showTrashModal && (
+              <div className="modal-overlay" onClick={() => setShowTrashModal(false)}>
+                <div className="modal-content trash-modal" onClick={(e) => e.stopPropagation()}>
+                  <div className="modal-header">
+                    <h2>Cestino</h2>
+                    <button className="clear-trash-btn" onClick={emptyTrash}>Svuota tutto</button>
+                  </div>
+                  <div className="trash-items">
+                    {(tasks["Trash"] || []).map(t => (
+                      <div key={t.id} className="trash-item-row">{t.text || t.task}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* MODALE ARCHIVIO (Menu Azioni) */}
+            {showArchiveModal && (
+              <div 
+                className={activeTask ? "archive-modal-overlay is-dragging" : "archive-modal-overlay"} 
+                onClick={() => { if (!activeTask) setShowArchiveModal(false); }}
+              >
+                <div className="archive-modal-content" onClick={(e) => e.stopPropagation()}>
+                  <div className="archive-modal-header">
+                    <h2>Azioni & Archivio 📋</h2>
+                    <button className="close-modal-btn" onClick={() => setShowArchiveModal(false)}>✖</button>
+                  </div>
+                  
+                  <DroppableContainer id="Backlog" className="archive-drop-zone">
+                    <SortableContext items={tasks["Backlog"] || []} strategy={rectSortingStrategy}>
+                      <div className="archive-grid">
+                        {(tasks["Backlog"] || []).map((t) => (
+                          <TaskItem
+                            key={t.id || t.text || t.task}
+                            task={t}
+                            toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)}
+                            editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)}
+                          />
+                        ))}
+                      </div>
                     </SortableContext>
                   </DroppableContainer>
-                )}
+                </div>
+              </div>
+            )}
+              
+            {/* MONITOR DI DEBUG (In fondo al DndContext) */}
+            <div style={{
+              position: "fixed",
+              bottom: "10px",
+              left: "10px",
+              right: "10px",
+              backgroundColor: "rgba(0,0,0,0.8)",
+              color: "#0f0",
+              fontSize: "10px",
+              padding: "5px",
+              borderRadius: "5px",
+              zIndex: 99999,
+              pointerEvents: "none",
+              fontFamily: "monospace"
+            }}>
+              {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
+              {debugLogs.length === 0 && <div>Monitor di Debug Attivo...</div>}
+            </div>
+
+            {/* ZONA TRASCINAMENTO (Quello che vedi "sotto il dito") */}
+            <DragOverlay dropAnimation={null}>
+              {activeTask ? (
+                <div className="task-item-dragging">
+                  <TaskItem task={activeTask} isOverlay />
+                </div>
+              ) : null}
+            </DragOverlay>
+
+          </div>
+        </DndContext>
+
+        {/* MODALE AGGIUNTA RAPIDA (Fuori dal DndContext perché non serve il drag) */}
+        {isQuickAddOpen && (
+          <div className="modal-overlay" onClick={() => setIsQuickAddOpen(false)}>
+            <div className="modal-content glass" onClick={(e) => e.stopPropagation()}>
+              <h3>Nuova Attività 📝</h3>
+              <textarea
+                className="modal-textarea"
+                placeholder="Cosa devi fare?"
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                autoFocus
+              />
+              <div className="modal-actions">
+                <button className="btn-cancel" onClick={() => { setIsQuickAddOpen(false); setNewTask(""); }}>Annulla</button>
+                <button className="btn-save" onClick={() => { handleAddTask(); setIsQuickAddOpen(false); }}>Salva</button>
               </div>
             </div>
           </div>
         )}
-        {/* --- MONITOR DI DEBUG VISUALE (SOLO PER TEST) ---
-            Mostra in tempo reale cosa sta succedendo durante il drag sul telefono.
-            Puoi rimuovere questo intero blocco <div> quando l'app è perfetta. */}
-        <div style={{
-          position: "fixed",
-          bottom: "10px",
-          left: "10px",
-          right: "10px",
-          backgroundColor: "rgba(0,0,0,0.8)",
-          color: "#0f0",
-          fontSize: "10px",
-          padding: "5px",
-          borderRadius: "5px",
-          zIndex: 99999,
-          pointerEvents: "none",
-          fontFamily: "monospace"
-        }}>
-          {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
-          {debugLogs.length === 0 && <div>Monitor di Debug Attivo...</div>}
-        </div>
-      </DndContext>
 
-
-      {/* --- FINESTRA DI AGGIUNTA RAPIDA (QUICK ADD) --- */}
-      {isQuickAddOpen && (
-        <div className="modal-overlay" onClick={() => setIsQuickAddOpen(false)}>
-          <div className="modal-content glass" onClick={(e) => e.stopPropagation()}>
-            <h3>Nuova Attività 📝</h3>
-            <textarea
-              className="modal-textarea"
-              placeholder="Cosa devi fare?"
-              value={newTask}
-              onChange={(e) => setNewTask(e.target.value)}
-              autoFocus
-            />
-            <div className="modal-actions">
-              <button className="btn-cancel" onClick={() => { setIsQuickAddOpen(false); setNewTask(""); setNewTaskTime(""); }}>Annulla</button>
-              <button className="btn-save" onClick={() => { handleAddTask(); setIsQuickAddOpen(false); }}>Salva</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* --- DRAG OVERLAY (L'effetto visivo del trascinamento) ---
-          È la copia del task che "fluttua" sotto il tuo dito mentre lo sposti. */}
-      {createPortal(
-        <DragOverlay dropAnimation={null} zIndex={9999}>
-          {activeTask ? (
-            <div className="dragging-task-mirror">
-               <TaskItem task={activeTask} toggleDone={() => {}} editTaskText={() => {}} />
-            </div>
-          ) : null}
-        </DragOverlay>,
-        document.body
-      )}
-
-      {/* --- PORTALI DI NAVIGAZIONE SETTIMANALE ---
-          Sono le zone visive che appaiono ai bordi dello schermo quando tieni un task 
-          sul lato sinistro o destro per cambiare settimana. */}
-      {draggingEdge === 'left' && (
-        <div className="week-portal left active">
-          <span>PRECEDENTE</span>
-        </div>
-      )}
-      {draggingEdge === 'right' && (
-        <div className="week-portal right active">
-          <span>SUCCESSIVA</span>
-        </div>
-      )}
-
-    </div>
-  );
+        {/* FEEDBACK VISIVO BORDI (Per il cambio settimana automatico) */}
+        {draggingEdge === 'left' && <div className="week-portal left active"><span>PRECEDENTE</span></div>}
+        {draggingEdge === 'right' && <div className="week-portal right active"><span>SUCCESSIVA</span></div>}
+      </div>
+    );
 }
 
 export default App;
