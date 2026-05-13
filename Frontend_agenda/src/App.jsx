@@ -49,9 +49,18 @@ function App() {
   const [draggingEdge, setDraggingEdge] = useState(null); // 'left' | 'right' | null (indica se siamo sul bordo)
   const [edgeTimer, setEdgeTimer] = useState(null);
   
+  // --- MONITOR DI DEBUG (TEMPORANEO) ---
+  const [debugLogs, setDebugLogs] = useState([]);
+  const addDebugLog = (msg) => {
+    setDebugLogs(prev => [msg, ...prev].slice(0, 5));
+    console.log("DEBUG:", msg);
+  };
+  // --------------------------------------
+  
   // --- CONFIGURAZIONE NAVIGAZIONE AI BORDI ---
-  const EDGE_TIMEOUT = 1200; // Tempo (in ms) da aspettare sul bordo prima di girare pagina
-  const EDGE_THRESHOLD = 80; // Larghezza (in pixel) della zona sensibile ai bordi dello schermo
+  // Queste costanti decidono quanto è sensibile il bordo dello schermo per cambiare settimana durante il drag.
+  const EDGE_TIMEOUT = 1200; // Millisecondi da aspettare sul bordo prima di girare pagina
+  const EDGE_THRESHOLD = 80; // Larghezza in pixel della zona sensibile ai lati dello schermo
   // --------------------------------------------
 
   const [addingToDay, setAddingToDay] = useState(null); // Giorno in cui stiamo aggiungendo un task inline
@@ -138,11 +147,16 @@ function App() {
   const touchStartX = useRef(null);
   const touchStartY = useRef(null);
 
+  // --- CONFIGURAZIONE SENSORI DRAG & DROP ---
+  // Decidono come l'app reagisce al tocco o al mouse.
   const sensors = useSensors(
     useSensor(PointerSensor, {
+      // Su PC, il drag inizia solo dopo aver mosso il mouse di 8 pixel (evita click accidentali)
       activationConstraint: { distance: 8 },
     }),
     useSensor(TouchSensor, {
+      // Su MOBILE, il drag inizia solo dopo aver tenuto premuto per 200ms.
+      // Questo permette di scorrere la pagina normalmente senza "prendere" i task per sbaglio.
       activationConstraint: { delay: 200, tolerance: 10 },
     })
   );
@@ -414,6 +428,10 @@ function App() {
     });
   };
 
+  /**
+   * handleDragStart: Viene chiamata non appena inizi a trascinare un task.
+   * Qui "prendiamo" il task e lo mettiamo in uno stato temporaneo (activeTask).
+   */
   const handleDragStart = (event) => {
     // Correctly handle both Mouse/Pointer events and Touch events
     const ae = event.activatorEvent;
@@ -443,6 +461,9 @@ function App() {
       setDraggingEdge(null);
       activeEdgeRef.current = null;
       if (weekTimerRef.current) clearTimeout(weekTimerRef.current);
+      addDebugLog(`START: ${foundTask.text || foundTask.task} da ${foundDay}`);
+    } else {
+      addDebugLog(`START: Task non trovato per ID ${active.id}`);
     }
   };
 
@@ -505,6 +526,10 @@ function App() {
   };
 
 
+  /**
+   * handleDragEnd: La funzione più importante. Viene chiamata quando rilascio il task.
+   * Decide se lo spostamento è valido e aggiorna il database.
+   */
   const handleDragEnd = async (event) => {
     // 1. Pulizia timer e bordi
     if (edgeTimer) clearTimeout(edgeTimer);
@@ -671,12 +696,13 @@ function App() {
 
     // Se per qualche motivo il task è sparito, lo ripristiniamo nel contenitore originale
     if (!taskExists && foundTaskObj) {
-      console.warn("Rete di sicurezza: task ripristinato.");
+      addDebugLog("SAFETY: Task ripristinato!");
       updatedTasks[activeContainer] = [...(updatedTasks[activeContainer] || []), foundTaskObj];
     }
 
     setTasks(updatedTasks);
     updateTasks(updatedTasks);
+    addDebugLog(`END: Spostato in ${overContainer}`);
     finishDrag(overContainer !== "Backlog");
   };
 
@@ -689,6 +715,10 @@ function App() {
   /**
    * Motore di collisione personalizzato.
    * Decide quale elemento ha la priorità quando trasciniamo un task sopra altri elementi.
+   */
+  /**
+   * customCollisionDetection: Il "cervello" che capisce cosa c'è sotto il tuo dito.
+   * Determina la priorità tra menu, giorni e cestino.
    */
   const customCollisionDetection = (args) => {
     const { active, droppableContainers } = args;
@@ -1054,9 +1084,30 @@ function App() {
             </div>
           </div>
         )}
+        {/* --- MONITOR DI DEBUG VISUALE (SOLO PER TEST) ---
+            Mostra in tempo reale cosa sta succedendo durante il drag sul telefono.
+            Puoi rimuovere questo intero blocco <div> quando l'app è perfetta. */}
+        <div style={{
+          position: "fixed",
+          bottom: "10px",
+          left: "10px",
+          right: "10px",
+          backgroundColor: "rgba(0,0,0,0.8)",
+          color: "#0f0",
+          fontSize: "10px",
+          padding: "5px",
+          borderRadius: "5px",
+          zIndex: 99999,
+          pointerEvents: "none",
+          fontFamily: "monospace"
+        }}>
+          {debugLogs.map((log, i) => <div key={i}>{log}</div>)}
+          {debugLogs.length === 0 && <div>Monitor di Debug Attivo...</div>}
+        </div>
       </DndContext>
 
 
+      {/* --- FINESTRA DI AGGIUNTA RAPIDA (QUICK ADD) --- */}
       {isQuickAddOpen && (
         <div className="modal-overlay" onClick={() => setIsQuickAddOpen(false)}>
           <div className="modal-content glass" onClick={(e) => e.stopPropagation()}>
@@ -1076,6 +1127,8 @@ function App() {
         </div>
       )}
 
+      {/* --- DRAG OVERLAY (L'effetto visivo del trascinamento) ---
+          È la copia del task che "fluttua" sotto il tuo dito mentre lo sposti. */}
       {createPortal(
         <DragOverlay dropAnimation={null} zIndex={9999}>
           {activeTask ? (
@@ -1087,7 +1140,9 @@ function App() {
         document.body
       )}
 
-      {/* Edge Portals for Visual Feedback during drag */}
+      {/* --- PORTALI DI NAVIGAZIONE SETTIMANALE ---
+          Sono le zone visive che appaiono ai bordi dello schermo quando tieni un task 
+          sul lato sinistro o destro per cambiare settimana. */}
       {draggingEdge === 'left' && (
         <div className="week-portal left active">
           <span>PRECEDENTE</span>
