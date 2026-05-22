@@ -220,7 +220,8 @@ async def verify_mfa(data: dict):
         raise HTTPException(status_code=401, detail="Sessione non valida")
     
     totp = pyotp.TOTP(MFA_SECRET)
-    if not totp.verify(code):
+    # Aumentiamo la tolleranza al disallineamento dell'ora (drift) fino a 90 secondi prima/dopo (valid_window=3)
+    if not totp.verify(code, valid_window=3):
         raise HTTPException(status_code=401, detail="Codice MFA Errato")
     
     token = secrets.token_hex(32)
