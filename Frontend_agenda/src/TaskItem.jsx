@@ -3,8 +3,6 @@ import { CSS } from "@dnd-kit/utilities";
 import { useState, useEffect, useRef } from "react";
 
 export default function TaskItem({ task, toggleDone, editTaskText }) {
-  // Usiamo l'ID come identificatore unico per il drag, oppure il testo come fallback estremo
-  const draggableId = String(task.id || task.text || task.task);
   const { 
     attributes, 
     listeners, 
@@ -12,7 +10,7 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
     transform, 
     transition,
     isDragging 
-  } = useSortable({ id: draggableId });
+  } = useSortable({ id: task.id || task.task });
     
   const [isEditing, setIsEditing] = useState(false);
   const displayText = task.text || task.task || "";
@@ -23,27 +21,20 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
     if (isEditing && inputRef.current) {
       inputRef.current.focus();
       inputRef.current.selectionStart = inputRef.current.value.length;
-      
       inputRef.current.style.height = "auto";
       inputRef.current.style.height = inputRef.current.scrollHeight + "px";
     }
   }, [isEditing]);
 
   const style = {
-    // Se il task è in fase di trascinamento (isDragging), lo rendiamo trasparente (opacity: 0)
-    // Questo perché dnd-kit mostra una "copia" (DragOverlay) e non vogliamo vedere l'originale sotto.
-    opacity: isDragging ? 0 : 1, 
-    visibility: isDragging ? "hidden" : "visible",
-    
+    opacity: isDragging ? 0.5 : 1,
     cursor: isEditing ? "text" : "grab",
     position: "relative",
     display: "flex",
     alignItems: "flex-start", 
     wordBreak: "break-word",
-    transform: CSS.Translate.toString(transform), // Gestisce il movimento fluido del task nella lista
+    transform: CSS.Translate.toString(transform),
     transition,
-    zIndex: isDragging ? 9999 : "auto",
-    pointerEvents: isDragging ? "none" : "auto"
   };
 
   const handleSave = () => {
@@ -61,9 +52,8 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
       style={style} 
       {...attributes} 
       {...(isEditing ? {} : listeners)}
-      className={`task-item ${task.done ? "task-done" : ""} ${isDragging ? "is-dragging" : ""}`.trim()}
+      className={`task-item ${task.done ? "task-done" : ""}`}
       onDoubleClick={() => { if (!task.done) setIsEditing(true); }}
-      title={!task.done && !isEditing ? "Doppio clic per modificare" : ""}
     >
       <input 
         type="checkbox" 
