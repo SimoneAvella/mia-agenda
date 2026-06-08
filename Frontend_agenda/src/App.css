@@ -237,7 +237,7 @@
   padding: 5px 10px 10px 10px; /* Ridotto padding superiore */
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow-y: hidden;
   box-sizing: border-box;
   position: relative;
 }
