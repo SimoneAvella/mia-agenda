@@ -234,7 +234,7 @@
 .day-column {
   flex: 1;
   background: white;
-  padding: 5px 10px 10px 10px; /* Ridotto padding superiore */
+  padding: 5px 4px 10px 4px; /* Ridotto padding superiore */
   display: flex;
   flex-direction: column;
   overflow-y: hidden;
@@ -444,7 +444,11 @@
 .task-item {
   background: #ffffff;
   border: 2px solid black;
-  padding: 6px 3px;
+  width: 100%;            /* garantisce il riempimento */
+  max-width: none;        /* rimuove eventuali limiti di larghezza */
+  margin: 0 0 8px 0;      /* solo margine verticale, niente margine laterale */
+  padding: 6px 8px;       /* mantieni un po' di padding interno per la leggibilità */
+  box-sizing: border-box;/* include padding nel calcolo della larghezza */
   border-radius: 6px;
   margin-bottom: 8px;
   position: relative;
@@ -454,7 +458,7 @@
   font-size: 14px;
   display: flex;
   align-items: flex-start;
-  gap: 3px;
+  gap: 0 px;
 }
 
 .task-item:hover {
