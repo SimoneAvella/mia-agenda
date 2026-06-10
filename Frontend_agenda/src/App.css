@@ -888,6 +888,7 @@
     flex: 1;
     overflow-y: auto;
     padding: 6px 0;
+    padding-top: 8px;
     touch-action: pan-y; /* Allow scroll in day columns */
     -webkit-overflow-scrolling: touch;
   }
