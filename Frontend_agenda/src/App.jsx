@@ -578,7 +578,9 @@ function App() {
                 return (
                   <div key={i} className={`day-column-wrapper ${isToday ? 'is-today-wrapper' : ''}`}>
                     <DroppableContainer className={`day-column ${isToday ? 'is-today' : ''}`} id={day}>
-                      <h3 className={isToday ? "today-header" : ""}>{day}</h3>
+                      <div className="day-header-wrapper">
+                        <h3 className={isToday ? "today-header" : ""}>{day}</h3>
+                      </div>
                       <div className="column-scroll-area" onDoubleClick={() => { setAddingToDay(day); setInlineDayTask(""); }}>
                         <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                           {tasks[day]?.map((t) => (
