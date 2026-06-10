@@ -34,8 +34,8 @@ export async function checkAuth() {
   const token = localStorage.getItem("agenda_token");
   if (!token) return false;
 
-  const maxRetries = 15; // 15 tentativi = circa 45-50 secondi di attesa risveglio
-  const retryDelay = 3000;
+  const maxRetries = 30; // 30 tentativi ≈ 2.5‑3 minuti, più tempo di attesa per il server Render
+  const retryDelay = 5000; // 5 secondi di pausa tra i tentativi
 
   for (let i = 0; i < maxRetries; i++) {
     try {

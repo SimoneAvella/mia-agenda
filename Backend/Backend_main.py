@@ -123,7 +123,7 @@ def reminder_worker():
                             webpush(
                                 subscription_info=json.loads(sub.subscription_info),
                                 data=json.dumps({
-                                    "title": "PROMEMORIA AGENTA 🚀",
+                                    "title": "PROMEMORIA AGENDA 🚀",
                                     "body": f"È l'ora di: {t.text}",
                                     "icon": "/logo192.png"
                                 }),
@@ -224,7 +224,9 @@ async def verify_mfa(data: dict):
         raise HTTPException(status_code=401, detail="Codice MFA Errato")
     
     token = secrets.token_hex(32)
-    days = 30 if remember else 1
+    # Impostiamo una durata più lunga della sessione:
+    # se l'utente spunta "remember me" manteniamo 365 giorni, altrimenti 90 giorni.
+    days = 365 if remember else 90
     expiry = datetime.now() + timedelta(days=days)
     
     db = SessionLocal()
