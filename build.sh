@@ -3,7 +3,7 @@ set -euo pipefail
 
 echo "=== Install Python dependencies ==="
 # Adjust path if your requirements file is elsewhere
-pip install -r Backend/requirements.txt
+pip install -r requirements.txt
 
 echo "=== Install Node dependencies ==="
 cd Frontend_agenda
