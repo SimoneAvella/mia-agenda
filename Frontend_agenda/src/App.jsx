@@ -619,20 +619,9 @@ function App() {
                 <div className="left-group">
                   <h2 className="backlog-title">Attività 📓</h2>
                   <button className="add-task-btn" onClick={() => setShowInput(true)}>➕</button>
-                  <button 
-                    onClick={() => {
-                      if(window.confirm("Vuoi cancellare TUTTI i task nel backlog?")) {
-                        const newTasks = { ...tasks };
-                        newTasks["Backlog"] = [];
-                        setTasks(newTasks);
-                        updateTasks(newTasks);
-                      }
-                    }}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '14px', marginLeft: '10px', color: '#ff4444' }}
-                  >
-                    🗑️ Svuota tutto
-                  </button>
-                  <DroppableContainer id="trash-zone" className="trash-drop-zone" title="Trascina qui per eliminare" onClick={() => setShowTrashModal(true)}>🗑️</DroppableContainer>
+                  <DroppableContainer id="trash-zone" className="trash-drop-zone" title="Trascina qui per eliminare" onClick={() => setShowTrashModal(true)}>
+                    <button className="action-btn-circ trash" title="Cestino">🗑️</button>
+                  </DroppableContainer>
                 </div>
                 <div className="week-nav-buttons">
                   <DroppableContainer id="prev-week-btn" className="nav-drop-zone" onClick={prevWeek}><button className="nav-btn">←</button></DroppableContainer>
