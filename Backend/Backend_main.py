@@ -11,11 +11,14 @@ from datetime import datetime, timedelta
 from sqlalchemy import create_engine, Column, String, Boolean, DateTime, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.exc import OperationalError
 import threading
 import time
 from pywebpush import webpush, WebPushException
 
 # --- CONFIGURAZIONE ---
+import logging
+import re
 DATABASE_URL = os.environ.get("DATABASE_URL")
 VAPID_PRIVATE_KEY = os.environ.get("VAPID_PRIVATE_KEY")
 VAPID_PUBLIC_KEY = os.environ.get("VAPID_PUBLIC_KEY")
@@ -70,13 +73,25 @@ Base = declarative_base()
 
 if not DATABASE_URL:
     # Se non c'è il DB online, l'app segnala l'errore chiaramente
-    print("ERRORE: DATABASE_URL non impostato! Collegati a Render.")
+    logging.error("⚠️ DATABASE_URL non impostata! Uso SQLite temporaneo (solo per debug).")
     # Fallback minimo per non far crashare il caricamento del modulo
-    engine = create_engine("sqlite:///:memory:") 
+    engine = create_engine("sqlite:///:memory:")
 else:
+    # Normalizza l'URL se necessario
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    engine = create_engine(DATABASE_URL)
+
+    # Maschera password nei log
+    safe_url = re.sub(r"://([^:]+):[^@]+@", r"://\1:******@", DATABASE_URL)
+    logging.info(f"🔧 DATABASE_URL impostata: {safe_url}")
+
+    # Creazione dell'engine con pool pre‑ping e riciclo ogni 30 min
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_recycle=1800,
+        connect_args={"sslmode": "require"},
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -151,11 +166,16 @@ def get_db():
 async def check_auth(authorization: str = Header(None)):
     if not authorization:
         raise HTTPException(status_code=401, detail="Missing Token")
-    
+
     token = authorization.replace("Bearer ", "")
-    db = SessionLocal()
-    session = db.query(SessionModel).filter(SessionModel.token == token).first()
-    db.close()
+    try:
+        db = SessionLocal()
+        session = db.query(SessionModel).filter(SessionModel.token == token).first()
+    except OperationalError as e:
+        logging.warning(f"⚠️ DB connection error in check_auth: {e}")
+        raise HTTPException(status_code=401, detail="Database connection error")
+    finally:
+        db.close()
     
     if not session:
         raise HTTPException(status_code=401, detail="Invalid Token")
