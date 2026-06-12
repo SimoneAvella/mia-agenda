@@ -654,12 +654,12 @@ function App() {
           ) : null}
         </DragOverlay>
         {showTrashModal && (
-          <div className="modal-overlay" onClick={() => setShowTrashModal(false)}>
-            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+          <div className="trash-modal-overlay" onClick={() => setShowTrashModal(false)}>
+            <div className="trash-modal-content" onClick={(e) => e.stopPropagation()}>
               <h2>Cestino 🗑️</h2>
               <div className="trash-items-list">
                 {(tasks["Trash"] || []).map((t, idx) => (
-                  <div key={t.id || idx} className="trash-item-row"><span>{t.text || t.task}</span><button onClick={() => restoreTask(t.id)}>Ripristina</button></div>
+                  <div key={t.id || idx} className="trash-item"><span>{t.text || t.task}</span><button className="restore-btn" onClick={() => restoreTask(t.id)}>Ripristina</button></div>
                 ))}
               </div>
               <button className="empty-trash-btn" onClick={emptyTrash}>Svuota</button>

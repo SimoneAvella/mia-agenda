@@ -332,7 +332,8 @@
   from { opacity: 0; transform: translateY(-4px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-
+@keyframes overlayFadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes modalScaleIn { from { transform: scale(0.94); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .inline-day-textarea {
   width: 100%;
   border: 1.5px solid #3b82f6;
@@ -535,27 +536,31 @@
 .trash-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.6);
-  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px) saturate(180%);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 10000;
-  animation: fadeIn 0.3s ease-out;
+  animation: overlayFadeIn 0.24s ease forwards;
 }
 
+
 .trash-modal-content {
-  background: #ffffff;
-  padding: 24px;
+  background: rgba(255, 255, 255, 0.85);
+  padding: 32px;
   max-height: 80vh;
-  border-radius: 16px;
-  width: 500px;
-  max-width: 90%;
+  border-radius: 20px;
+  width: 560px;
+  max-width: 96vw;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 30px 60px -12px rgba(0,0,0,0.35), inset 0 0 0 1px rgba(255,255,255,0.6);
+  backdrop-filter: blur(8px);
+  animation: modalScaleIn 0.28s cubic-bezier(0.22,1,0.36,1) forwards;
 }
+
+
 
 .trash-mod.backlog-header {
   display: flex;
@@ -594,13 +599,21 @@
 
 .trash-item {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-left: 4px solid #ef4444;
   border-radius: 8px;
   padding: 12px 16px;
+  font-size: 0.94rem;
+}
+.trash-item:hover {
+  background: #f1f5f9;
+}
+.empty-trash-btn:hover { background: #dc2626; box-shadow: 0 4px 12px rgba(239,68,68,0.3); }
+.trash-item span {
+  flex: 1;
 }
 
 .restore-btn {
@@ -624,6 +637,10 @@
   font-weight: 700;
   cursor: pointer;
   text-transform: uppercase;
+}
+.empty-trash-btn:hover {
+  background: #dc2626;
+  box-shadow: 0 4px 12px rgba(239,68,68,0.3);
 }
 
 /* =========================
