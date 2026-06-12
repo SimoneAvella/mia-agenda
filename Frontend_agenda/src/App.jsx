@@ -662,7 +662,7 @@ function App() {
                   <div key={t.id || idx} className="trash-item-row"><span>{t.text || t.task}</span><button onClick={() => restoreTask(t.id)}>Ripristina</button></div>
                 ))}
               </div>
-              <button className="empty-trash-btn-alt" onClick={emptyTrash}>Svuota</button>
+              <button className="empty-trash-btn" onClick={emptyTrash}>Svuota</button>
             </div>
           </div>
         )}
