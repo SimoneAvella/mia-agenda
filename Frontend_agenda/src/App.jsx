@@ -150,20 +150,19 @@ function App() {
     if (isAuthenticated) setDays(getWeekDates(weekStart));
   }, [weekStart, isAuthenticated]);
 
-  const fetchTasks = async () => {
-    const data = await getTasks();
-    const normalized = {};
-    Object.keys(data).forEach(day => {
-      normalized[day] = data[day].map((t, i) => ({
-        ...t,
-        id: String(t.id || `task-${day}-${i}-${Date.now()}`)
-      }));
-    });
-    setTasks(normalized);
-  };
-
   useEffect(() => {
     if (isAuthenticated) {
+      async function fetchTasks() {
+        const data = await getTasks();
+        const normalized = {};
+        Object.keys(data).forEach(day => {
+          normalized[day] = data[day].map((t, i) => ({
+            ...t,
+            id: String(t.id || `task-${day}-${i}-${Date.now()}`)
+          }));
+        });
+        setTasks(normalized);
+      }
       fetchTasks();
     }
   }, [isAuthenticated]);
@@ -585,7 +584,7 @@ function App() {
                       <div className="column-scroll-area" onDoubleClick={() => { setAddingToDay(day); setInlineDayTask(""); }}>
                         <SortableContext items={tasks[day] || []} strategy={verticalListSortingStrategy}>
                           {tasks[day]?.map((t) => (
-                            <TaskItem key={t.id || t.task} task={t} day={day} refreshTasks={fetchTasks} toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)} editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)} />
+                            <TaskItem key={t.id || t.task} task={t} toggleDone={() => toggleTaskDone(day, t.id, t.text || t.task)} editTaskText={(newText) => editTaskText(day, t.id, t.text || t.task, newText)} />
                           ))}
                         </SortableContext>
                         {addingToDay === day && (
@@ -640,7 +639,7 @@ function App() {
                     )}
                     <SortableContext items={columns[colIdx] || []} strategy={verticalListSortingStrategy}>
                       {columns[colIdx].map((t) => (
-                        <TaskItem key={t.id || t.task} task={t} day="Backlog" refreshTasks={fetchTasks} toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)} editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)} />
+                        <TaskItem key={t.id || t.task} task={t} toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)} editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)} />
                       ))}
                     </SortableContext>
                   </DroppableContainer>
@@ -675,7 +674,7 @@ function App() {
                 <SortableContext items={tasks["Backlog"] || []} strategy={rectSortingStrategy}>
                   <div className="archive-grid">
                     {(tasks["Backlog"] || []).map((t) => (
-                      <TaskItem key={t.id || t.text || t.task} task={t} day="Backlog" refreshTasks={fetchTasks} toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)} editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)} />
+                      <TaskItem key={t.id || t.text || t.task} task={t} toggleDone={() => toggleTaskDone("Backlog", t.id, t.text || t.task)} editTaskText={(newText) => editTaskText("Backlog", t.id, t.text || t.task, newText)} />
                     ))}
                   </div>
                 </SortableContext>

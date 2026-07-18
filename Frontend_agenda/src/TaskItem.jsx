@@ -1,11 +1,8 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { useState, useEffect, useRef } from "react";
-import { useDrag } from '@use-gesture/react';
-import { moveTaskAPI } from './api';
-import { shiftWeek } from './utils/date';
 
-export default function TaskItem({ task, toggleDone, editTaskText, day, refreshTasks }) {
+export default function TaskItem({ task, toggleDone, editTaskText }) {
   const { 
     attributes, 
     listeners, 
@@ -19,42 +16,6 @@ export default function TaskItem({ task, toggleDone, editTaskText, day, refreshT
   const displayText = task.text || task.task || "";
   const [editText, setEditText] = useState(displayText);
   const inputRef = useRef(null);
-  const [dragSide, setDragSide] = useState(null);
-
-  const bind = useDrag(
-    ({ down, event, last }) => {
-      if (day === "Backlog") return; // Non spostiamo di settimana task nel backlog
-
-      if (!down) {
-        if (last && dragSide) {
-          const newDay = shiftWeek(day, dragSide === 'right' ? 1 : -1);
-          moveTaskAPI(day, newDay, task.id || task.task).then(() => {
-            if (refreshTasks) refreshTasks();
-          }).catch(e => console.error("Errore nello spostamento:", e));
-        }
-        setDragSide(null);
-        return;
-      }
-
-      let clientX;
-      if (event.touches && event.touches.length > 0) {
-         clientX = event.touches[0].clientX;
-      } else {
-         clientX = event.clientX;
-      }
-
-      const MARGIN = 30; // 30px di margine per facilitare l'attivazione
-      if (clientX !== undefined) {
-        if (clientX < MARGIN) setDragSide('left');
-        else if (clientX > window.innerWidth - MARGIN) setDragSide('right');
-        else setDragSide(null);
-      }
-    },
-    {
-      delay: 500, // 500ms di long press prima che parta il drag
-      pointer: { touch: true }
-    }
-  );
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -91,8 +52,7 @@ export default function TaskItem({ task, toggleDone, editTaskText, day, refreshT
       style={style} 
       {...attributes} 
       {...(isEditing ? {} : listeners)}
-      {...bind()}
-      className={`task-item ${task.done ? "task-done" : ""} ${dragSide === 'left' ? 'drag-left' : ''} ${dragSide === 'right' ? 'drag-right' : ''}`.trim()}
+      className={`task-item ${task.done ? "task-done" : ""}`}
       onDoubleClick={() => { if (!task.done) setIsEditing(true); }}
     >
       <input 
