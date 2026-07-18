@@ -922,7 +922,9 @@
   }
 
   .column-scroll-area .task-item {
-    touch-action: none; /* Let dnd-kit handle touch in day columns for drag */
+    touch-action: pan-y; /* scroll verticale libero, il drag parte dopo 400ms */
+    user-select: none;   /* impedisce la selezione del testo al long press */
+    -webkit-user-select: none;
   }
 
   .mobile-action-center {
@@ -1301,13 +1303,35 @@
 }
 
 .column-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
   transition: background-color 0.2s ease;
   border-radius: 6px;
   padding: 5px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0,0,0,0.15) transparent;
 }
 
 .column-scroll-area:hover {
   background-color: rgba(0, 0, 0, 0.015);
+}
+
+.column-scroll-area::-webkit-scrollbar {
+  width: 4px;
+}
+
+.column-scroll-area::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.column-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.15);
+  border-radius: 4px;
+}
+
+.column-scroll-area::-webkit-scrollbar-thumb:hover {
+  background: rgba(0,0,0,0.3);
 }
 
 .add-task-click-area {
