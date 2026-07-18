@@ -534,14 +534,16 @@ function App() {
 
   const customCollisionDetection = (args) => {
     const collisions = pointerWithin(args);
-    if (collisions.length > 0) return collisions;
+    if (collisions.length > 0) {
+      const edgeCollision = collisions.find(c => c.id === 'edge-left' || c.id === 'edge-right');
+      if (edgeCollision) return [edgeCollision];
+      return collisions;
+    }
     return rectIntersection(args);
   };
 
   return (
     <div className={`app-container ${draggingEdge ? `edge-active-${draggingEdge}` : ""}`} >
-      <DroppableContainer id="edge-left" className="edge-drop-zone left" />
-      <DroppableContainer id="edge-right" className="edge-drop-zone right" />
       {isMobile && (
         <div className="mobile-top-nav">
           <span className="mobile-title">Calendario 🗓️</span>
@@ -570,6 +572,8 @@ function App() {
         collisionDetection={customCollisionDetection}
         measuring={{ droppable: { strategy: MeasuringStrategy.WhileDragging } }}
       >
+        <DroppableContainer id="edge-left" className="edge-drop-zone left" />
+        <DroppableContainer id="edge-right" className="edge-drop-zone right" />
         <div className="main-layout">
           <div className="calendar-section">
             <div className="week-container" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
