@@ -64,7 +64,7 @@ export default function Login({ onLoginSuccess }) {
                         <input
                             type="text"
                             className="task-input login-input mfa-input"
-                            placeholder="000 000"
+                            placeholder="      "
                             value={mfaCode}
                             onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
                             autoFocus
