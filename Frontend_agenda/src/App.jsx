@@ -534,7 +534,11 @@ function App() {
 
   const customCollisionDetection = (args) => {
     const collisions = pointerWithin(args);
-    if (collisions.length > 0) return collisions;
+    if (collisions.length > 0) {
+      const edgeCollision = collisions.find(c => c.id === 'edge-left' || c.id === 'edge-right');
+      if (edgeCollision) return [edgeCollision];
+      return collisions;
+    }
     return rectIntersection(args);
   };
 
