@@ -194,8 +194,7 @@ function App() {
     return (
       <div className="loading-screen">
         <div style={{ textAlign: 'center' }}>
-          <p>Caricamento... ☕</p>
-          <p style={{ fontSize: '12px', color: '#888', marginTop: '10px' }}>Il primo accesso può richiedere fino a 30 secondi.</p>
+          <p>Caricamento... 🗓️</p>
         </div>
       </div>
     );
