@@ -150,21 +150,37 @@ function App() {
     if (isAuthenticated) setDays(getWeekDates(weekStart));
   }, [weekStart, isAuthenticated]);
 
+  const fetchTasks = async () => {
+    if (!isAuthenticated) return;
+    const data = await getTasks();
+    const normalized = {};
+    Object.keys(data).forEach(day => {
+      normalized[day] = data[day].map((t, i) => ({
+        ...t,
+        id: String(t.id || `task-${day}-${i}-${Date.now()}`)
+      }));
+    });
+    setTasks(normalized);
+  };
+
   useEffect(() => {
-    if (isAuthenticated) {
-      async function fetchTasks() {
-        const data = await getTasks();
-        const normalized = {};
-        Object.keys(data).forEach(day => {
-          normalized[day] = data[day].map((t, i) => ({
-            ...t,
-            id: String(t.id || `task-${day}-${i}-${Date.now()}`)
-          }));
-        });
-        setTasks(normalized);
+    if (!isAuthenticated) return;
+
+    fetchTasks();
+
+    const handleFocusOrVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        fetchTasks();
       }
-      fetchTasks();
-    }
+    };
+
+    window.addEventListener('focus', handleFocusOrVisibility);
+    document.addEventListener('visibilitychange', handleFocusOrVisibility);
+
+    return () => {
+      window.removeEventListener('focus', handleFocusOrVisibility);
+      document.removeEventListener('visibilitychange', handleFocusOrVisibility);
+    };
   }, [isAuthenticated]);
 
   useEffect(() => {

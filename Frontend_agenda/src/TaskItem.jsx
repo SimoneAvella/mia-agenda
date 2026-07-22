@@ -63,7 +63,7 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
         style={{ marginTop: task.time ? "4px" : "1px", flexShrink: 0, cursor: "pointer" }} 
       />
       
-      <div style={{ display: "flex", flexDirection: "column", flex: 1, marginLeft: "0px" }}>
+      <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
         {task.time && !isEditing && (
           <div className="task-time-header">
             <span className="task-time-label">⏰ {task.time}</span>

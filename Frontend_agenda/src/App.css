@@ -455,7 +455,7 @@
   width: 100%;            /* garantisce il riempimento */
   max-width: none;        /* rimuove eventuali limiti di larghezza */
   margin: 0 0 8px 0;      /* solo margine verticale, niente margine laterale */
-  padding: 6px 8px;       /* mantieni un po' di padding interno per la leggibilità */
+  padding: 6px 4px 6px 3px; /* meno padding sx per avvicinare la checkbox al bordo */
   box-sizing: border-box;/* include padding nel calcolo della larghezza */
   border-radius: 6px;
   margin-bottom: 8px;
@@ -466,7 +466,7 @@
   font-size: 14px;
   display: flex;
   align-items: flex-start;
-  gap: 0 px;
+  gap: 4px;
 }
 
 .task-item:hover {
