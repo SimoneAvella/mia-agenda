@@ -1,6 +1,6 @@
 import socketio
 from fastapi import Depends
-from Backend.deps import get_current_user
+
 import json
 
 # Create Socket.IO server (async mode for FastAPI)
@@ -14,9 +14,22 @@ async def connect(sid, environ, auth):
         await sio.disconnect(sid)
         return
     try:
-        user = await get_current_user(token)
-        await sio.save_session(sid, {"user_id": user["username"]})
-        print(f"🔗 WS connected: {sid} as {user['username']}")
+        from Backend.Backend_main import SessionLocal, SessionModel
+        from datetime import datetime
+        db = SessionLocal()
+        session_obj = db.query(SessionModel).filter(SessionModel.token == token).first()
+        
+        if not session_obj or datetime.now() > session_obj.expiry:
+            if session_obj:
+                db.delete(session_obj)
+                db.commit()
+            db.close()
+            await sio.disconnect(sid)
+            return
+            
+        db.close()
+        await sio.save_session(sid, {"auth": True})
+        print(f"🔗 WS connected: {sid}")
     except Exception as e:
         print("WS auth failed:", e)
         await sio.disconnect(sid)
