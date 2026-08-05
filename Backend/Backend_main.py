@@ -324,7 +324,7 @@ def get_tasks(db: SessionLocal = Depends(get_db), auth: bool = Depends(check_aut
     return result
 
 @app.post("/tasks")
-def update_tasks(tasks_dict: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
+def update_tasks(tasks_dict: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     db.query(TaskModel).delete()
     for day, tasks in tasks_dict.items():
         if isinstance(tasks, list):
@@ -346,7 +346,7 @@ from Backend.ws import broadcast_task_change
 import asyncio
 
 @app.post("/task")
-async def add_task_atomic(task: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
+async def add_task_atomic(task: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     new_task = TaskModel(
         id=str(task.get("id", secrets.token_hex(4))),
         day=task.get("day"),
@@ -368,8 +368,10 @@ async def add_task_atomic(task: dict, db: SessionLocal = Depends(get_db), auth: 
     })
     return {"status": "ok", "task_id": new_task.id}
 
+from fastapi import Body
+
 @app.patch("/task/{task_id}")
-async def update_task_atomic(task_id: str, changes: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
+async def update_task_atomic(task_id: str, changes: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
@@ -400,9 +402,9 @@ async def delete_task_atomic(task_id: str, db: SessionLocal = Depends(get_db), a
     return {"status": "ok"}
 
 @app.post("/move_task")
-async def move_task(data: dict, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
-    to_date = data.get("to_date")
-    task_id = data.get("task_id")
+def move_task(payload: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
+    to_date = payload.get("to_date")
+    task_id = payload.get("task_id")
     
     task = db.query(TaskModel).filter(TaskModel.id == str(task_id)).first()
     if task:
