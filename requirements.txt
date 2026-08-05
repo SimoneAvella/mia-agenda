@@ -12,3 +12,4 @@ bcrypt
 pywebpush
 pywebpush
 cryptography
+python-socketio
