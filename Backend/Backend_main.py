@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends, Header, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -367,8 +367,6 @@ async def add_task_atomic(task: dict = Body(...), db: SessionLocal = Depends(get
         "time": new_task.time
     })
     return {"status": "ok", "task_id": new_task.id}
-
-from fastapi import Body
 
 @app.patch("/task/{task_id}")
 async def update_task_atomic(task_id: str, changes: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
