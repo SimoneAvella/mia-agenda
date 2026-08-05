@@ -7,7 +7,7 @@ const ENABLE_WEEK_EDGE_DRAG = true; // set to false to disable
 import { createPortal } from "react-dom";
 import { getWeekDates, getTodayString } from "./utils/dates";
 import TaskItem from "./TaskItem";
-import { getTasks, updateTasks, moveTaskAPI, checkAuth, logout, API_BASE_URL } from "./api";
+import { getTasks, moveTaskAPI, checkAuth, logout, API_BASE_URL, initSocket, addTask as apiAddTask, patchTask as apiPatchTask, deleteTask as apiDeleteTask } from "./api";
 import {
   DndContext,
   PointerSensor,
@@ -185,6 +185,45 @@ function App() {
 
   useEffect(() => {
     if (!isAuthenticated) return;
+    const socket = initSocket(
+      (payload) => {
+        setTasks(prev => {
+          const newTasks = { ...prev };
+          if (!newTasks[payload.day]) newTasks[payload.day] = [];
+          if (!newTasks[payload.day].find(t => String(t.id) === String(payload.id))) {
+            newTasks[payload.day].push(payload);
+          }
+          return newTasks;
+        });
+      },
+      (payload) => {
+        setTasks(prev => {
+          const newTasks = { ...prev };
+          Object.keys(newTasks).forEach(key => {
+            newTasks[key] = newTasks[key].filter(t => String(t.id) !== String(payload.id));
+          });
+          if (!newTasks[payload.day]) newTasks[payload.day] = [];
+          newTasks[payload.day].push(payload);
+          return newTasks;
+        });
+      },
+      (payload) => {
+        setTasks(prev => {
+          const newTasks = { ...prev };
+          if (newTasks[payload.day]) {
+            newTasks[payload.day] = newTasks[payload.day].filter(t => String(t.id) !== String(payload.id));
+          }
+          return newTasks;
+        });
+      }
+    );
+    return () => {
+      if (socket) socket.disconnect();
+    };
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
     const checkReminders = () => {
       const now = new Date();
       const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
@@ -231,7 +270,7 @@ function App() {
     newTasks[day] = [...newTasks[day]];
     newTasks[day][idx] = { ...newTasks[day][idx], done: !newTasks[day][idx].done };
     setTasks(newTasks);
-    updateTasks(newTasks);
+    apiPatchTask(newTasks[day][idx].id, { done: newTasks[day][idx].done });
   };
 
   const deleteTask = (day, taskId, taskText) => {
@@ -243,7 +282,7 @@ function App() {
     const deletedTask = newTasks[day].splice(idx, 1)[0];
     newTasks["Trash"] = [...newTasks["Trash"], deletedTask];
     setTasks(newTasks);
-    updateTasks(newTasks);
+    apiPatchTask(deletedTask.id, { day: "Trash", done: false });
   };
 
   const editTaskText = (day, taskId, oldText, newText) => {
@@ -254,7 +293,7 @@ function App() {
     newTasks[day] = [...newTasks[day]];
     newTasks[day][idx] = { ...newTasks[day][idx], text: newText, task: newText };
     setTasks(newTasks);
-    updateTasks(newTasks);
+    apiPatchTask(newTasks[day][idx].id, { text: newText });
   };
 
   const restoreTask = (taskId) => {
@@ -266,15 +305,16 @@ function App() {
     if (!newTasks["Backlog"]) newTasks["Backlog"] = [];
     newTasks["Backlog"].push(restoredTask);
     setTasks(newTasks);
-    updateTasks(newTasks);
+    apiPatchTask(restoredTask.id, { day: "Backlog", done: false });
   };
 
   const emptyTrash = () => {
     if (window.confirm("Sei sicuro di voler svuotare il cestino definitivamente?")) {
+      const trashTasks = tasks["Trash"] || [];
+      trashTasks.forEach(t => apiDeleteTask(t.id));
       const newTasks = { ...tasks };
       newTasks["Trash"] = [];
       setTasks(newTasks);
-      updateTasks(newTasks);
     }
   };
 
@@ -287,7 +327,7 @@ function App() {
     if (!newTasks[targetDay]) newTasks[targetDay] = [];
     newTasks[targetDay].push(taskToMove);
     setTasks(newTasks);
-    await updateTasks(newTasks);
+    await apiPatchTask(taskToMove.id, { day: targetDay, done: false });
     setMovingTaskId(null);
   };
 
@@ -300,17 +340,18 @@ function App() {
     const newId = Date.now().toString();
     const timeToSet = parseTime(newTask);
     const cleanedText = stripTime(newTask);
+    const newTaskObj = { id: newId, text: cleanedText, task: cleanedText, done: false, time: timeToSet, day: "Backlog" };
     const updatedTasks = {
       ...tasks,
       Backlog: [
-        { id: newId, text: cleanedText, task: cleanedText, done: false, time: timeToSet },
+        newTaskObj,
         ...(tasks["Backlog"] || [])
       ]
     };
     setTasks(updatedTasks);
     setNewTask("");
     setShowInput(false);
-    updateTasks(updatedTasks);
+    apiAddTask(newTaskObj);
   };
 
   const handleAddTaskToDay = async (day) => {
@@ -324,7 +365,8 @@ function App() {
       id: `task-${day}-${Date.now()}`,
       text: cleanedText,
       done: false,
-      time: timeToSet
+      time: timeToSet,
+      day: day
     };
     const newTasks = { ...tasks };
     if (!newTasks[day]) newTasks[day] = [];
@@ -332,7 +374,7 @@ function App() {
     setTasks(newTasks);
     setAddingToDay(null);
     setInlineDayTask("");
-    await updateTasks(newTasks);
+    await apiAddTask(newTaskObj);
   };
 
   const prevWeek = () => {
@@ -452,7 +494,7 @@ function App() {
         trashList.push({ ...foundT, done: false });
         updatedTasks["Trash"] = trashList;
         setTasks(updatedTasks);
-        updateTasks(updatedTasks);
+        apiPatchTask(foundT.id, { day: "Trash", done: false });
       }
       finishDrag(true);
       return;
@@ -480,7 +522,7 @@ function App() {
         }
         updatedTasks["Backlog"] = backlogList;
         setTasks(updatedTasks);
-        updateTasks(updatedTasks);
+        apiPatchTask(foundT.id, { day: "Backlog", done: false });
       }
       finishDrag(false);
       return;
@@ -537,7 +579,14 @@ function App() {
       updatedTasks[overContainer] = destList;
     }
     setTasks(updatedTasks);
-    updateTasks(updatedTasks);
+    
+    // Update position/column in DB if needed (here we just update day if changed, and order manually)
+    // The previous implementation used updateTasks(updatedTasks) to save order. 
+    // For now, if the activeContainer != overContainer, we must update the day in DB
+    if (activeContainer !== overContainer) {
+      apiPatchTask(foundTaskObj.id, { day: overContainer });
+    }
+    
     finishDrag(overContainer !== "Backlog");
   };
 

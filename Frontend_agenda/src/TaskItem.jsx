@@ -1,4 +1,5 @@
 import { useSortable } from "@dnd-kit/sortable";
+import { adjustTranslate } from "@dnd-kit/modifiers";
 import { CSS } from "@dnd-kit/utilities";
 import { useState, useEffect, useRef } from "react";
 
@@ -10,7 +11,17 @@ export default function TaskItem({ task, toggleDone, editTaskText }) {
     transform, 
     transition,
     isDragging 
-  } = useSortable({ id: task.id || task.task });
+  } = useSortable({
+    id: task.id || task.task,
+    modifiers: [
+      adjustTranslate({
+          offset: ({ draggingNodeRect }) => {
+            const { width, height } = draggingNodeRect;
+            return { x: -width / 2, y: -height / 2 };
+          },
+        }),
+    ],
+  });
     
   const [isEditing, setIsEditing] = useState(false);
   const displayText = task.text || task.task || "";
