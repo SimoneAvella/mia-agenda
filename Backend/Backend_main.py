@@ -402,7 +402,7 @@ async def delete_task_atomic(task_id: str, db: SessionLocal = Depends(get_db), a
     return {"status": "ok"}
 
 @app.post("/move_task")
-def move_task(payload: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
+async def move_task(payload: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     to_date = payload.get("to_date")
     task_id = payload.get("task_id")
     
