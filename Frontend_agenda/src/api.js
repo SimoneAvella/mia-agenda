@@ -90,12 +90,12 @@ export async function addTask(task) {
 }
 
 export async function patchTask(id, changes) {
-  const res = await api.patch(`/task/${id}`, changes);
+  const res = await api.patch(`/task/${encodeURIComponent(id)}`, changes);
   return res.data;
 }
 
 export async function deleteTask(id) {
-  const res = await api.delete(`/task/${id}`);
+  const res = await api.delete(`/task/${encodeURIComponent(id)}`);
   return res.data;
 }
 

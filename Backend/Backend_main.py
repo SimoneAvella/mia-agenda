@@ -368,7 +368,7 @@ async def add_task_atomic(task: dict = Body(...), db: SessionLocal = Depends(get
     })
     return {"status": "ok", "task_id": new_task.id}
 
-@app.patch("/task/{task_id}")
+@app.patch("/task/{task_id:path}")
 async def update_task_atomic(task_id: str, changes: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     print(f"PATCH /task/{task_id} - changes: {changes}")
     task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
@@ -392,7 +392,7 @@ async def update_task_atomic(task_id: str, changes: dict = Body(...), db: Sessio
     })
     return {"status": "ok"}
 
-@app.delete("/task/{task_id}")
+@app.delete("/task/{task_id:path}")
 async def delete_task_atomic(task_id: str, db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
     task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if task:

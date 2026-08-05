@@ -367,7 +367,7 @@ function App() {
     const timeToSet = parseTime(inlineDayTask);
     const cleanedText = stripTime(inlineDayTask);
     const newTaskObj = {
-      id: `task-${day}-${Date.now()}`,
+      id: `task-${day.replace(/\//g, '-')}-${Date.now()}`,
       text: cleanedText,
       done: false,
       time: timeToSet,
