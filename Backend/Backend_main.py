@@ -370,8 +370,10 @@ async def add_task_atomic(task: dict = Body(...), db: SessionLocal = Depends(get
 
 @app.patch("/task/{task_id}")
 async def update_task_atomic(task_id: str, changes: dict = Body(...), db: SessionLocal = Depends(get_db), auth: bool = Depends(check_auth)):
+    print(f"PATCH /task/{task_id} - changes: {changes}")
     task = db.query(TaskModel).filter(TaskModel.id == task_id).first()
     if not task:
+        print(f"PATCH 404: task '{task_id}' not found in DB. All IDs: {[t.id for t in db.query(TaskModel).all()]}")
         raise HTTPException(status_code=404, detail="Task not found")
     
     for key, value in changes.items():

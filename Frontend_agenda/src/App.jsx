@@ -273,7 +273,7 @@ function App() {
     apiPatchTask(newTasks[day][idx].id, { done: newTasks[day][idx].done });
   };
 
-  const deleteTask = (day, taskId, taskText) => {
+  const deleteTask = async (day, taskId, taskText) => {
     const newTasks = { ...tasks };
     if (!newTasks[day]) return;
     const idx = newTasks[day].findIndex(t => (t.id ? t.id === taskId : (t.text === taskText || t.task === taskText)));
@@ -282,7 +282,12 @@ function App() {
     const deletedTask = newTasks[day].splice(idx, 1)[0];
     newTasks["Trash"] = [...newTasks["Trash"], deletedTask];
     setTasks(newTasks);
-    apiPatchTask(deletedTask.id, { day: "Trash", done: false });
+    try {
+      await apiPatchTask(deletedTask.id, { day: "Trash", done: false });
+    } catch (e) {
+      console.error("❌ PATCH deleteTask failed, re-fetching", e);
+      fetchTasks();
+    }
   };
 
   const editTaskText = (day, taskId, oldText, newText) => {
@@ -494,7 +499,12 @@ function App() {
         trashList.push({ ...foundT, done: false });
         updatedTasks["Trash"] = trashList;
         setTasks(updatedTasks);
-        apiPatchTask(foundT.id, { day: "Trash", done: false });
+        try {
+          await apiPatchTask(foundT.id, { day: "Trash", done: false });
+        } catch (e) {
+          console.error("❌ PATCH drag-to-trash failed, re-fetching", e);
+          fetchTasks();
+        }
       }
       finishDrag(true);
       return;
