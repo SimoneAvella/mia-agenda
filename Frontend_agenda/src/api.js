@@ -66,7 +66,7 @@ export function logout() {
 }
 
 export async function getTasks() {
-  const res = await api.get(`/tasks`);
+  const res = await api.get(`/tasks?t=${Date.now()}`);
   return res.data;
 }
 
