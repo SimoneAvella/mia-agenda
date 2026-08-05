@@ -1,5 +1,10 @@
 fastapi
-uvicorn
+uvicorn[standard]
 sqlalchemy
 pywebpush
 cryptography
+python-jose
+python-socketio
+python-engineio
+bcrypt
+pyotp

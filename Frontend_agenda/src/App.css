@@ -36,6 +36,11 @@
 /* STILE PER IL "FANTASMA" CHE TRASCINI */
 .dragging-task-mirror {
   opacity: 0.5 !important; /* Molto trasparente */
+  transform: translate(-50%, -50%) scale(1.05);  /* Centra sotto il cursore */
+  pointer-events: none;
+  z-index: 99999 !important;
+}
+  opacity: 0.5 !important; /* Molto trasparente */
   transform: scale(1.05);  /* Leggermente più grande per enfasi */
   pointer-events: none;
   z-index: 99999 !important;
@@ -531,11 +536,19 @@
   user-select: none;
 }
 
-.trash-drop-zone.is-drag-over {
-  transform: scale(1.6);
-  color: #ef4444; 
-  background: rgba(239, 68, 68, 0.1); 
+.trash-drop-zone.is-drag-over,
+.trash-drop-zone.is-over {
+  color: #ef4444;
 }
+
+.trash-drop-zone.is-drag-over .action-btn-circ.trash,
+.trash-drop-zone.is-over .action-btn-circ.trash {
+  transform: scale(1.35) !important;
+  background: #fee2e2 !important;
+  border-color: #b91c1c !important;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4) !important;
+}
+
 
 /* =========================
    MODALE CESTINO
@@ -945,7 +958,7 @@
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    transition: transform 0.1s;
+    transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     font-size: 26px;
     padding: 0;
   }
@@ -975,16 +988,20 @@
     box-shadow: 3px 3px 0px rgba(239,68,68,0.2);
   }
 
-  .action-btn-circ-wrapper.is-drag-over .action-btn-circ.archive {
+  .action-btn-circ-wrapper.is-drag-over .action-btn-circ.archive,
+  .action-btn-circ-wrapper.is-over .action-btn-circ.archive {
     background: #e0f2fe;
     border-color: #0369a1;
-    transform: scale(1.1);
+    transform: scale(1.25);
+    box-shadow: 0 0 15px rgba(3, 105, 161, 0.4);
   }
 
-  .action-btn-circ-wrapper.is-drag-over .action-btn-circ.trash {
+  .action-btn-circ-wrapper.is-drag-over .action-btn-circ.trash,
+  .action-btn-circ-wrapper.is-over .action-btn-circ.trash {
     background: #fee2e2;
     border-color: #b91c1c;
-    transform: scale(1.1);
+    transform: scale(1.25);
+    box-shadow: 0 0 15px rgba(185, 28, 28, 0.4);
   }
 
   /* Archive Modal Specifics */
