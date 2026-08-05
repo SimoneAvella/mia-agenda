@@ -40,11 +40,7 @@
   pointer-events: none;
   z-index: 99999 !important;
 }
-  opacity: 0.5 !important; /* Molto trasparente */
-  transform: scale(1.05);  /* Leggermente più grande per enfasi */
-  pointer-events: none;
-  z-index: 99999 !important;
-}
+/* duplicate stray block removed */
 
 .dragging-task-mirror .task-item {
   background: rgba(255, 255, 255, 0.8) !important;
